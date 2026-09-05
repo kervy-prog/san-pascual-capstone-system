@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#123b36" />
+    <title>San Pascual Connect</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="auth-shell">
+      <section class="welcome-panel">
+        <div class="brand-mark" aria-hidden="true"><span>SP</span></div>
+        <p class="eyebrow">SAN NARCISO · ZAMBALES</p>
+        <h1>Better barangay services, closer to home.</h1>
+        <p class="welcome-copy">A shared space for San Pascual residents and local officials to keep infrastructure concerns moving.</p>
+        <div class="status-note"><span class="status-dot"></span><span>San Pascual service desk</span><strong>Online</strong></div>
+        <div class="welcome-footer"><span>Barangay San Pascual</span><span>Est. 2026</span></div>
+      </section>
+
+      <section class="form-panel" aria-labelledby="form-title">
+        <div class="mobile-brand"><div class="brand-mark small" aria-hidden="true"><span>SP</span></div><span>San Pascual Connect</span></div>
+        <div class="form-heading">
+          <p class="eyebrow" id="form-kicker">WELCOME BACK</p>
+          <h2 id="form-title">Sign in to your desk</h2>
+          <p id="form-subtitle">Track requests, report concerns, and stay connected.</p>
+        </div>
+
+        <div class="mode-switch" role="tablist" aria-label="Account access mode">
+          <button class="mode-button active" data-mode="login" role="tab" aria-selected="true">Log in</button>
+          <button class="mode-button" data-mode="signup" role="tab" aria-selected="false">Create account</button>
+        </div>
+
+        <form id="auth-form" novalidate>
+          <div class="role-picker">
+            <p class="field-label">I am signing in as</p>
+            <div class="role-options" role="radiogroup" aria-label="Account role">
+              <button type="button" class="role-option active" data-role="RESIDENT" role="radio" aria-checked="true"><span class="role-icon">⌂</span><span>Resident</span></button>
+              <button type="button" class="role-option" data-role="STAFF" role="radio" aria-checked="false"><span class="role-icon">▤</span><span>Barangay official</span></button>
+              <button type="button" class="role-option login-only-role" data-role="ADMIN" role="radio" aria-checked="false"><span class="role-icon">◆</span><span>Admin login</span></button>
+            </div>
+          </div>
+
+          <div class="signup-fields hidden" id="signup-fields">
+            <div class="name-grid">
+              <label class="field"><span>Last name</span><input id="last-name" type="text" autocomplete="family-name" placeholder="Dela Cruz" /></label>
+              <label class="field"><span>First name</span><input id="first-name" type="text" autocomplete="given-name" placeholder="Juan" /></label>
+            </div>
+            <label class="field"><span>Middle name</span><input id="middle-name" type="text" autocomplete="additional-name" placeholder="Santos" /></label>
+            <div class="details-grid">
+              <label class="field"><span>Age</span><input id="age" type="number" min="18" max="120" placeholder="18" /></label>
+              <label class="field"><span>Gender</span><select id="gender"><option value="">Select gender</option><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="NON_BINARY">Non-binary</option><option value="PREFER_NOT_TO_SAY">Prefer not to say</option></select></label>
+            </div>
+            <div class="details-grid">
+              <label class="field"><span>Birthdate</span><input id="birth-date" type="date" autocomplete="bday" /></label>
+              <label class="field"><span>Nationality</span><input id="nationality" type="text" value="Filipino" autocomplete="country-name" /></label>
+            </div>
+            <label class="field"><span>Contact number</span><input id="phone" type="tel" autocomplete="tel" placeholder="09XX XXX XXXX" /></label>
+            <label class="field"><span>Full address</span><textarea id="address" rows="2" placeholder="House no., street, sitio / purok"></textarea></label>
+            <div class="location-grid">
+              <label class="field"><span>Barangay</span><input id="barangay" type="text" value="San Pascual" readonly /></label>
+              <label class="field"><span>Municipality</span><input id="municipality" type="text" value="San Narciso" readonly /></label>
+              <label class="field"><span>Province</span><input id="province" type="text" value="Zambales" readonly /></label>
+            </div>
+            <label class="eligibility"><input id="residency-confirmed" type="checkbox" /><span>I confirm that I am a Filipino citizen and a resident of Barangay San Pascual, San Narciso, Zambales.</span></label>
+            <label class="eligibility privacy-consent"><input id="privacy-consent" type="checkbox" /><span>I consent that my personal details and uploaded documents may be used only for administrative verification under the Philippine Data Privacy Act and applicable Philippine law.</span></label>
+            <div class="official-fields hidden" id="official-fields">
+              <p class="section-label">Official verification</p>
+              <label class="field"><span>Barangay designation / position</span><input id="designation-position" type="text" placeholder="Barangay Captain, Kagawad, Secretary" /></label>
+              <div class="details-grid">
+                <label class="field"><span>Government ID type</span><input id="government-id-type" type="text" placeholder="Driver's license, passport" /></label>
+                <label class="field"><span>Government ID number</span><input id="government-id-number" type="text" placeholder="ID number" /></label>
+              </div>
+              <label class="field"><span>Government-issued ID <em>JPG, PNG, WEBP or PDF · max 5 MB</em></span><input id="government-id-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" /></label>
+              <label class="field"><span>Proof of appointment / oath of office <em>Photo or PDF · max 5 MB</em></span><input id="appointment-proof-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" /></label>
+              <p class="verification-note">Official accounts are subject to barangay verification before access to official tools is granted.</p>
+            </div>
+          </div>
+
+          <label class="field"><span>Email address</span><input id="email" type="email" autocomplete="email" placeholder="you@example.com" required /></label>
+          <label class="field"><span>Password <em id="password-hint">8 characters minimum</em></span><div class="password-wrap"><input id="password" type="password" autocomplete="new-password" placeholder="Enter your password" required minlength="8" /><button type="button" class="password-toggle" id="password-toggle" aria-label="Show password">Show</button></div></label>
+          <div class="password-rules hidden" id="password-rules">Use uppercase, lowercase, a number, and a special character such as <strong>!</strong>, <strong>@</strong>, <strong>#</strong>, <strong>$</strong>, <strong>%</strong>, <strong>&amp;</strong>, or <strong>*</strong>.</div>
+          <label class="field signup-only-password hidden" id="confirm-password-field"><span>Confirm password</span><div class="password-wrap"><input id="confirm-password" type="password" autocomplete="new-password" placeholder="Re-enter your password" /><button type="button" class="password-toggle confirm-toggle" aria-label="Show confirmation password">Show</button></div></label>
+
+          <div class="form-meta"><label class="remember"><input id="remember" type="checkbox" /><span>Remember me</span></label><button type="button" class="text-button" id="forgot-button">Forgot password?</button></div>
+          <button class="submit-button" id="submit-button" type="submit"><span id="submit-label">Continue to your desk</span><span class="button-arrow" aria-hidden="true">→</span></button>
+          <p class="form-message" id="form-message" role="status" aria-live="polite"></p>
+        </form>
+        <p class="legal-copy">By continuing, you agree to use this service for legitimate barangay concerns.</p>
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

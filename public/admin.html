@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Desk · San Pascual Connect</title>
+  <link rel="stylesheet" href="/admin.css" />
+</head>
+<body>
+  <main class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-brand"><span>SP</span><div><strong>San Pascual</strong><small>Admin desk</small></div></div>
+      <div class="admin-lock"><span>◆</span><div><strong>Restricted area</strong><small>Admin access only</small></div></div>
+      <nav><a class="active" href="#overview">Overview</a><a href="#approvals">Approvals <b id="nav-pending">0</b></a><a href="#reports">Infrastructure reports</a></nav>
+      <button class="logout-button" id="logout-button">Sign out <span>↗</span></button>
+    </aside>
+    <section class="admin-content">
+      <header class="admin-header"><div><p class="eyebrow">ADMINISTRATION · SAN PASCUAL</p><h1>Good day, <span id="admin-name">Admin</span>.</h1><p>Review access, protect resident data, and keep infrastructure action visible.</p></div><div class="admin-date" id="admin-date"></div></header>
+      <p class="dashboard-message" id="dashboard-message"></p>
+      <section class="stat-grid"><article class="stat-card"><span>Residents</span><strong id="resident-count">—</strong><small>registered accounts</small></article><article class="stat-card"><span>Officials</span><strong id="official-count">—</strong><small>official profiles</small></article><article class="stat-card"><span>Reports</span><strong id="report-count">—</strong><small>infrastructure records</small></article><article class="stat-card highlight"><span>Needs review</span><strong id="pending-count">—</strong><small>awaiting approval</small></article></section>
+      <section class="dashboard-section" id="approvals"><div class="section-heading"><div><p class="eyebrow">ACCESS CONTROL</p><h2>Pending approvals</h2></div><span class="section-count" id="approval-count">0</span></div><div class="approval-list" id="approval-list"><div class="empty-state">Loading approvals...</div></div></section>
+      <section class="dashboard-section" id="reports"><div class="section-heading"><div><p class="eyebrow">FIELD OPERATIONS</p><h2>Infrastructure reports</h2></div></div><div class="report-table-wrap"><table><thead><tr><th>Ticket</th><th>Concern</th><th>Resident</th><th>Status</th><th>Submitted</th></tr></thead><tbody id="report-list"><tr><td colspan="5" class="empty-state">Loading reports...</td></tr></tbody></table></div></section>
+    </section>
+  </main>
+  <script src="/admin.js" defer></script>
+</body>
+</html>
