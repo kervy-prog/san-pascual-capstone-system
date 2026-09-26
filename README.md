@@ -33,7 +33,7 @@ Backend foundation for the infrastructure complaint and service request manageme
    npm install
    ```
 
-3. Copy `.env.example` to `.env` and set `DATABASE_URL` and a long `JWT_SECRET`.
+3. Copy `.env.example` to `.env` and set `DATABASE_URL` and a long `JWT_SECRET`. To enable resident SMS notifications, also set `SEMAPHORE_API_KEY` and an approved `SEMAPHORE_SENDER_NAME`.
 
 4. Generate and apply the Prisma schema:
 
@@ -76,7 +76,10 @@ For phone access on the same Wi-Fi, open `http://<computer-ip>:5500` instead of 
 - Admins approve and assign reports to approved officials.
 - Assigned officials update inspection and resolution status.
 - Residents see status changes automatically in their report history.
+- When an official changes a report to `IN_PROGRESS`, Semaphore sends the resident an SMS notification.
 - Admins can view uploaded images and their GPS-confirmed or landmark-based location.
+
+Semaphore uses the resident's Philippine contact number and sends: `Your report SP-... is now under progress. Our Barangay team is working on it.` If `SEMAPHORE_API_KEY` is not configured, the report workflow still works and the SMS is skipped.
 
 Run the full system test with:
 

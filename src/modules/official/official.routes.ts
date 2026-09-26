@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
+import { sendResidentProgressSms } from "../../lib/semaphore.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -104,7 +105,7 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
       const reportId = String(request.params.id);
       const assignedReport = await tx.infrastructureReport.findFirst({
         where: { id: reportId, assignedOfficialId: official.id },
-        select: { id: true },
+        select: { id: true, ticketNumber: true, resident: { select: { firstName: true, phone: true } } },
       });
       if (!assignedReport) {
         throw new Error("This report is not assigned to you");
@@ -124,10 +125,23 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
         },
       });
 
-      return updated;
+      return { ...updated, resident: assignedReport.resident };
     });
 
-    response.json(report);
+    if (status === "IN_PROGRESS") {
+      void sendResidentProgressSms(report.resident.phone, report.ticketNumber).catch((error: unknown) => {
+        console.error("Unable to send resident progress SMS:", error);
+      });
+    }
+
+    response.json({
+      id: report.id,
+      reportId: report.reportId,
+      ticketNumber: report.ticketNumber,
+      status: report.status,
+      currentStatus: report.currentStatus,
+      smsNotification: status === "IN_PROGRESS" ? "queued" : "not_applicable",
+    });
   } catch (error) {
     next(error);
   }
