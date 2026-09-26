@@ -122,7 +122,7 @@ function reportLocationMarkup(report, compact = false) {
   if (hasCoordinates) {
     const mapUrl = `https://www.google.com/maps?q=${report.locationLatitude},${report.locationLongitude}`;
     const openStreetMapUrl = `https://www.openstreetmap.org/?mlat=${report.locationLatitude}&mlon=${report.locationLongitude}#map=18/${report.locationLatitude}/${report.locationLongitude}`;
-    return `<a href="${mapUrl}" target="_blank" rel="noopener">${compact ? 'View location' : 'View on map'}</a> · <a href="${openStreetMapUrl}" target="_blank" rel="noopener">OpenStreetMap</a><small>${compact ? 'GPS-confirmed' : `${report.locationLatitude.toFixed(6)}, ${report.locationLongitude.toFixed(6)}`}</small>`;
+    return `<a href="${mapUrl}" target="_blank" rel="noopener">${compact ? 'View report pin' : 'View on map'}</a> · <a href="${openStreetMapUrl}" target="_blank" rel="noopener">OpenStreetMap</a><small>${compact ? 'GPS-confirmed report pin' : `${report.locationLatitude.toFixed(6)}, ${report.locationLongitude.toFixed(6)}`}</small>`;
   }
 
   const reportedArea = `${report.exactLocationLandmark}, San Pascual, San Narciso, Zambales`;
@@ -211,7 +211,8 @@ async function viewReportImage(mediaPath, locationData) {
   }
   const blob = await response.blob();
   reportMediaImage.src = URL.createObjectURL(blob);
-  reportMediaLocation.innerHTML = `<strong>Image location</strong><br>${reportLocationMarkup({
+  const hasGpsPin = Number.isFinite(Number.parseFloat(locationData.locationLatitude)) && Number.isFinite(Number.parseFloat(locationData.locationLongitude));
+  reportMediaLocation.innerHTML = `<strong>${hasGpsPin ? 'Pinned image location' : 'Approximate image location'}</strong><br>${reportLocationMarkup({
     exactLocationLandmark: decodeURIComponent(locationData.locationLandmark || ''),
     locationLatitude: Number.parseFloat(locationData.locationLatitude),
     locationLongitude: Number.parseFloat(locationData.locationLongitude),
