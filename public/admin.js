@@ -54,7 +54,8 @@ document.querySelector('#logout-button').addEventListener('click', () => {
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}/api/admin${path}`, { ...options, headers: { Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
-  const data = await response.json();
+  if (response.status === 204) return null;
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Admin request failed');
   return data;
 }
