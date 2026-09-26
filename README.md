@@ -72,6 +72,7 @@ For phone access on the same Wi-Fi, open `http://<computer-ip>:5500` instead of 
 ### Workflow
 
 - Residents submit infrastructure reports with optional image media.
+- Image reports require a geopin from image EXIF GPS metadata or the submitting device; the Node API returns this as JSON under `location`.
 - New reports wait in the admin **Report approval** section.
 - Admins approve and assign reports to approved officials.
 - Assigned officials update inspection and resolution status.

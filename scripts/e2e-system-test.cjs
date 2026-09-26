@@ -186,6 +186,8 @@ async function run() {
   reportForm.append('currentStatus', 'SUBMITTED');
   reportForm.append('dateSubmitted', new Date().toISOString());
   reportForm.append('submitAnonymously', 'false');
+  reportForm.append('locationLatitude', '15.0178547');
+  reportForm.append('locationLongitude', '120.0829188');
 
   const reportImage = Buffer.from('dummy report photo bytes');
   reportForm.append('media', new Blob([reportImage], { type: 'image/jpeg' }), 'clogged_drain.jpg');

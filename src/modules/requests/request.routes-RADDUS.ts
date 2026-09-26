@@ -91,6 +91,10 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     const submittedLocation = photoLocation || (input.locationLatitude !== undefined && input.locationLongitude !== undefined
       ? { latitude: input.locationLatitude, longitude: input.locationLongitude }
       : undefined);
+    if (imageFiles.length > 0 && !submittedLocation) {
+      response.status(422).json({ error: "A geopin is required for image reports. Allow device location or upload an image with GPS metadata." });
+      return;
+    }
     if (submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
       response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
       return;
@@ -126,7 +130,16 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
         })),
       });
     }
-    response.status(201).json(created);
+    response.status(201).json({
+      ...created,
+      location: submittedLocation
+        ? {
+            latitude: submittedLocation.latitude,
+            longitude: submittedLocation.longitude,
+            source: photoLocation ? "image-exif" : "device",
+          }
+        : null,
+    });
   } catch (error) {
     next(error);
   }
