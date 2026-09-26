@@ -6,6 +6,7 @@ const message = document.querySelector('#dashboard-message');
 const reportMediaModal = document.querySelector('#report-media-modal');
 const reportMediaImage = document.querySelector('#report-media-image');
 const reportMediaLocation = document.querySelector('#report-media-location');
+const reportMediaMap = document.querySelector('#report-media-map');
 let approvedOfficials = [];
 
 function closeReportMedia() {
@@ -13,6 +14,8 @@ function closeReportMedia() {
   reportMediaModal.classList.add('hidden');
   reportMediaImage.removeAttribute('src');
   reportMediaLocation.innerHTML = '';
+  reportMediaMap.classList.add('hidden');
+  reportMediaMap.removeAttribute('src');
   if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
 }
 
@@ -213,6 +216,13 @@ async function viewReportImage(mediaPath, locationData) {
     locationLatitude: Number.parseFloat(locationData.locationLatitude),
     locationLongitude: Number.parseFloat(locationData.locationLongitude),
   })}`;
+  const latitude = Number.parseFloat(locationData.locationLatitude);
+  const longitude = Number.parseFloat(locationData.locationLongitude);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    const delta = 0.004;
+    reportMediaMap.src = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - delta}%2C${latitude - delta}%2C${longitude + delta}%2C${latitude + delta}&layer=mapnik&marker=${latitude}%2C${longitude}`;
+    reportMediaMap.classList.remove('hidden');
+  }
   reportMediaModal.classList.remove('hidden');
 }
 
