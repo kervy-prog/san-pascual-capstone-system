@@ -120,7 +120,7 @@ function renderReportProgress(progress) {
 function reportLocationMarkup(report, compact = false) {
   const hasCoordinates = Number.isFinite(report.locationLatitude) && Number.isFinite(report.locationLongitude);
   if (hasCoordinates) {
-    const mapUrl = `https://www.google.com/maps?q=${report.locationLatitude},${report.locationLongitude}`;
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${report.locationLatitude}%2C${report.locationLongitude}`;
     const openStreetMapUrl = `https://www.openstreetmap.org/?mlat=${report.locationLatitude}&mlon=${report.locationLongitude}#map=18/${report.locationLatitude}/${report.locationLongitude}`;
     return `<a href="${mapUrl}" target="_blank" rel="noopener">${compact ? 'View report pin' : 'View on map'}</a> · <a href="${openStreetMapUrl}" target="_blank" rel="noopener">OpenStreetMap</a><small>${compact ? 'GPS-confirmed report pin' : `${report.locationLatitude.toFixed(6)}, ${report.locationLongitude.toFixed(6)}`}</small>`;
   }
