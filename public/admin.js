@@ -122,6 +122,9 @@ function reportLocationMarkup(report, compact = false) {
   if (hasCoordinates) {
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${report.locationLatitude}%2C${report.locationLongitude}`;
     const openStreetMapUrl = `https://www.openstreetmap.org/?mlat=${report.locationLatitude}&mlon=${report.locationLongitude}#map=18/${report.locationLatitude}/${report.locationLongitude}`;
+    if (report.locationSource === 'landmark-geocode-approximate') {
+      return `<a href="${mapUrl}" target="_blank" rel="noopener">View approximate area</a> · <a href="${openStreetMapUrl}" target="_blank" rel="noopener">OpenStreetMap</a><small>Barangay area estimate, not exact image GPS</small>`;
+    }
     return `<a href="${mapUrl}" target="_blank" rel="noopener">${compact ? 'View report pin' : 'View on map'}</a> · <a href="${openStreetMapUrl}" target="_blank" rel="noopener">OpenStreetMap</a><small>${compact ? 'GPS-confirmed report pin' : `${report.locationLatitude.toFixed(6)}, ${report.locationLongitude.toFixed(6)}`}</small>`;
   }
 
@@ -132,7 +135,7 @@ function reportLocationMarkup(report, compact = false) {
 }
 
 function reportMediaButton(image, report) {
-  return `<button class="view-media-button" data-media-path="${image.filePath}" data-location-landmark="${encodeURIComponent(report.exactLocationLandmark)}" data-location-latitude="${report.locationLatitude ?? ''}" data-location-longitude="${report.locationLongitude ?? ''}">View image</button>`;
+  return `<button class="view-media-button" data-media-path="${image.filePath}" data-location-landmark="${encodeURIComponent(report.exactLocationLandmark)}" data-location-latitude="${report.locationLatitude ?? ''}" data-location-longitude="${report.locationLongitude ?? ''}" data-location-source="${report.locationSource ?? ''}">View image</button>`;
 }
 
 async function loadApprovedResidents() {
@@ -212,10 +215,12 @@ async function viewReportImage(mediaPath, locationData) {
   const blob = await response.blob();
   reportMediaImage.src = URL.createObjectURL(blob);
   const hasGpsPin = Number.isFinite(Number.parseFloat(locationData.locationLatitude)) && Number.isFinite(Number.parseFloat(locationData.locationLongitude));
-  reportMediaLocation.innerHTML = `<strong>${hasGpsPin ? 'Pinned image location' : 'Approximate image location'}</strong><br>${reportLocationMarkup({
+  const locationSource = locationData.locationSource || '';
+  reportMediaLocation.innerHTML = `<strong>${hasGpsPin && locationSource !== 'landmark-geocode-approximate' ? 'Pinned image location' : 'Approximate image location'}</strong><br>${reportLocationMarkup({
     exactLocationLandmark: decodeURIComponent(locationData.locationLandmark || ''),
     locationLatitude: Number.parseFloat(locationData.locationLatitude),
     locationLongitude: Number.parseFloat(locationData.locationLongitude),
+    locationSource,
   })}`;
   const latitude = Number.parseFloat(locationData.locationLatitude);
   const longitude = Number.parseFloat(locationData.locationLongitude);

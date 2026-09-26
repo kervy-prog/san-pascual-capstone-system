@@ -143,6 +143,7 @@ model InfrastructureReport {
   status                ReportStatus           @default(SUBMITTED)
   locationLatitude      Float?
   locationLongitude     Float?
+  locationSource        String?
   assignedOfficialId    String?
   resident              Resident               @relation(fields: [residentId], references: [id])
   category              InfrastructureCategory @relation(fields: [categoryId], references: [id])

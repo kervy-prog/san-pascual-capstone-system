@@ -8,7 +8,7 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { isWithinSanPascualVicinity } from "./report-geofence.js";
-import { geocodeReportedLandmark } from "../../lib/geocoder.js";
+import { geocodeBarangayCenter, geocodeReportedLandmark } from "../../lib/geocoder.js";
 
 const router = Router();
 const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
@@ -92,7 +92,7 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     let submittedLocation = photoLocation || (input.locationLatitude !== undefined && input.locationLongitude !== undefined
       ? { latitude: input.locationLatitude, longitude: input.locationLongitude }
       : undefined);
-    let locationSource: "image-exif" | "device" | "landmark-geocode" | undefined = photoLocation
+    let locationSource: "image-exif" | "device" | "landmark-geocode" | "landmark-geocode-approximate" | undefined = photoLocation
       ? "image-exif"
       : submittedLocation
         ? "device"
@@ -102,7 +102,11 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
       locationSource = submittedLocation ? "landmark-geocode" : undefined;
     }
     if (imageFiles.length > 0 && !submittedLocation) {
-      response.status(422).json({ error: "An accurate geopin is required for image reports. Allow device location or enable camera GPS metadata before uploading." });
+      submittedLocation = await geocodeBarangayCenter().catch(() => undefined);
+      locationSource = submittedLocation ? "landmark-geocode-approximate" : undefined;
+    }
+    if (imageFiles.length > 0 && !submittedLocation) {
+      response.status(422).json({ error: "A location pin is required for image reports. Allow device location or enable camera GPS metadata." });
       return;
     }
     if (submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
@@ -122,6 +126,7 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
         ticketNumber: `SP-${Date.now().toString(36).toUpperCase()}`,
         locationLatitude: submittedLocation?.latitude,
         locationLongitude: submittedLocation?.longitude,
+        locationSource,
       },
     });
 
