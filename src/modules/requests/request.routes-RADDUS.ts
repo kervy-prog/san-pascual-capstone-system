@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { isWithinSanPascualVicinity } from "./report-geofence.js";
+import { geocodeReportedLandmark } from "../../lib/geocoder.js";
 
 const router = Router();
 const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
@@ -88,9 +89,18 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
       }
     }
 
-    const submittedLocation = photoLocation || (input.locationLatitude !== undefined && input.locationLongitude !== undefined
+    let submittedLocation = photoLocation || (input.locationLatitude !== undefined && input.locationLongitude !== undefined
       ? { latitude: input.locationLatitude, longitude: input.locationLongitude }
       : undefined);
+    let locationSource: "image-exif" | "device" | "landmark-geocode" | undefined = photoLocation
+      ? "image-exif"
+      : submittedLocation
+        ? "device"
+        : undefined;
+    if (imageFiles.length > 0 && !submittedLocation) {
+      submittedLocation = await geocodeReportedLandmark(input.exactLocationLandmark).catch(() => undefined);
+      locationSource = submittedLocation ? "landmark-geocode" : undefined;
+    }
     if (imageFiles.length > 0 && !submittedLocation) {
       response.status(422).json({ error: "A geopin is required for image reports. Allow device location or upload an image with GPS metadata." });
       return;
@@ -136,7 +146,7 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
         ? {
             latitude: submittedLocation.latitude,
             longitude: submittedLocation.longitude,
-            source: photoLocation ? "image-exif" : "device",
+            source: locationSource,
           }
         : null,
     });
