@@ -102,7 +102,7 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
       locationSource = submittedLocation ? "landmark-geocode" : undefined;
     }
     if (imageFiles.length > 0 && !submittedLocation) {
-      response.status(422).json({ error: "A geopin is required for image reports. Allow device location or upload an image with GPS metadata." });
+      response.status(422).json({ error: "An accurate geopin is required for image reports. Allow device location or enable camera GPS metadata before uploading." });
       return;
     }
     if (submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
