@@ -60,7 +60,7 @@ Backend foundation for the infrastructure complaint and service request manageme
    npm run frontend
    ```
 
-Open `http://localhost:5500`. The API health checks are `http://localhost:3000/health` and `http://localhost:3000/health/db`.
+Open `http://<computer-ip>:5500`. The API health checks are available through the same frontend host at `/health` and `/health/db`.
 
 ### Main screens
 
@@ -69,7 +69,7 @@ Open `http://localhost:5500`. The API health checks are `http://localhost:3000/h
 - `/official.html` - Barangay Official work queue
 - `/admin.html` - admin approvals, assignments, and report progress
 
-For phone access on the same Wi-Fi, open `http://<computer-ip>:5500` instead of `localhost`.
+For phone or another laptop access on the same Wi-Fi, open `http://<computer-ip>:5500`. Set `FRONTEND_HOST=0.0.0.0` to listen on all network interfaces, or set it to a specific host/IP for a fixed deployment.
 
 ### Workflow
 

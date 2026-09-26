@@ -1,10 +1,14 @@
 import http from 'node:http';
+import 'dotenv/config';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const frontendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-const port = Number(process.env.FRONTEND_PORT || 5500);
+const frontendHost = process.env.FRONTEND_HOST || '0.0.0.0';
+const frontendPort = Number(process.env.FRONTEND_PORT || 5500);
+const apiProxyHost = process.env.API_PROXY_HOST || '127.0.0.1';
+const apiProxyPort = Number(process.env.API_PROXY_PORT || 3000);
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -13,11 +17,11 @@ const contentTypes = {
 
 function proxyApiRequest(request, response) {
   const apiRequest = http.request({
-    hostname: 'localhost',
-    port: 3000,
+    hostname: apiProxyHost,
+    port: apiProxyPort,
     path: request.url,
     method: request.method,
-    headers: { ...request.headers, host: 'localhost:3000' },
+    headers: { ...request.headers, host: `${apiProxyHost}:${apiProxyPort}` },
   }, (apiResponse) => {
     response.writeHead(apiResponse.statusCode || 502, apiResponse.headers);
     apiResponse.pipe(response);
@@ -56,6 +60,6 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`San Pascual frontend listening on http://localhost:${port}`);
+server.listen(frontendPort, frontendHost, () => {
+  console.log(`San Pascual frontend listening on http://${frontendHost}:${frontendPort}`);
 });

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.API_BASE_URL || 'http://127.0.0.1:3000';
 
 async function assert(condition, message) {
   if (!condition) {
