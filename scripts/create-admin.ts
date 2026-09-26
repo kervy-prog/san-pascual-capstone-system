@@ -5,14 +5,10 @@ import { PrismaClient, UserRole } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD;
-  const firstName = process.env.ADMIN_FIRST_NAME?.trim();
-  const lastName = process.env.ADMIN_LAST_NAME?.trim();
-
-  if (!email || !password || !firstName || !lastName) {
-    throw new Error("Set ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_FIRST_NAME, and ADMIN_LAST_NAME before running admin:seed");
-  }
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase() || "admin@sanpascual.gov.ph";
+  const password = process.env.ADMIN_PASSWORD || "AdminPass123!";
+  const firstName = process.env.ADMIN_FIRST_NAME?.trim() || "System";
+  const lastName = process.env.ADMIN_LAST_NAME?.trim() || "Administrator";
 
   if (password.length < 8) {
     throw new Error("ADMIN_PASSWORD must be at least 8 characters");

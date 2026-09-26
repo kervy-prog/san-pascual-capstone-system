@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Official Dashboard · San Pascual Connect</title>
+  <link rel="stylesheet" href="/official.css" />
+</head>
+<body>
+  <main class="official-shell">
+    <aside class="official-sidebar">
+      <div class="official-brand"><span>SP</span><div><strong>San Pascual</strong><small>Official desk</small></div></div>
+      <nav>
+        <a class="active" href="#overview" data-target="overview">Overview</a>
+        <a href="#profile" data-target="profile">Profile</a>
+        <a href="#reports" data-target="reports">Reports</a>
+        <a href="#hazards" data-target="hazards">Designated hazards</a>
+      </nav>
+      <button class="logout-button" id="official-logout">Sign out <span>↗</span></button>
+    </aside>
+
+    <section class="official-content">
+      <header class="official-header">
+        <div><p class="eyebrow">BARANGAY OFFICIAL PORTAL</p><h1>Good day, <span id="official-name">Official</span>.</h1></div>
+        <div class="official-date" id="official-date"></div>
+      </header>
+      <p class="dashboard-message" id="official-message"></p>
+
+      <section id="overview" class="official-section active">
+        <div class="stat-grid">
+          <article class="stat-card"><span>Total reports</span><strong id="report-count">0</strong><small>all submitted hazards</small></article>
+          <article class="stat-card"><span>New reports</span><strong id="submitted-count">0</strong><small>awaiting action</small></article>
+          <article class="stat-card"><span>Resolved</span><strong id="resolved-count">0</strong><small>completed cases</small></article>
+        </div>
+        <div class="overview-note"><p class="eyebrow">WORK QUEUE</p><h2>Review designated hazards</h2><p>Open the designated hazards section to inspect location, urgency, resident details, and submitted media.</p></div>
+      </section>
+
+      <section id="profile" class="official-section">
+        <div class="section-heading"><div><p class="eyebrow">PROFILE</p><h2>Official information</h2></div></div>
+        <div class="profile-card">
+          <div class="profile-summary"><div class="profile-avatar" id="official-avatar">O</div><div><h3 id="full-name">Official Name</h3><p id="official-email">official@example.com</p></div></div>
+          <div class="profile-grid">
+            <div><label>Designation</label><p id="designation">—</p></div><div><label>Contact</label><p id="official-phone">—</p></div>
+            <div><label>Status</label><p id="approval-status">—</p></div><div><label>Barangay</label><p id="official-barangay">—</p></div>
+            <div><label>Municipality</label><p id="official-municipality">—</p></div><div><label>Address</label><p id="official-address">—</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="reports" class="official-section">
+        <div class="section-heading"><div><p class="eyebrow">REPORTS</p><h2>Infrastructure report register</h2></div></div>
+        <div class="report-table-wrap"><table><thead><tr><th>Ticket</th><th>Resident</th><th>Category</th><th>Urgency</th><th>Status</th><th>Submitted</th></tr></thead><tbody id="report-list"></tbody></table></div>
+      </section>
+
+      <section id="hazards" class="official-section">
+        <div class="section-heading"><div><p class="eyebrow">DESIGNATED REPORT OF HAZARD</p><h2>Hazard details</h2></div></div>
+        <div id="hazard-list" class="hazard-list"></div>
+      </section>
+    </section>
+  </main>
+  <script src="/config.js"></script>
+  <script src="/official.js" defer></script>
+</body>
+</html>

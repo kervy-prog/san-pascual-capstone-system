@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resident Dashboard · San Pascual Connect</title>
+  <link rel="stylesheet" href="/resident.css" />
+</head>
+<body>
+  <main class="resident-shell">
+    <aside class="resident-sidebar">
+      <div class="resident-brand"><span>SP</span><div><strong>San Pascual</strong><small>Resident desk</small></div></div>
+      <nav>
+        <a class="active" href="#overview">Overview</a>
+        <a href="#profile">Profile</a>
+        <a href="#reports">My reports</a>
+        <a href="#report-form">Infrastructure report</a>
+      </nav>
+      <button class="logout-button" id="resident-logout">Sign out <span>↗</span></button>
+    </aside>
+
+    <section class="resident-content">
+      <header class="resident-header">
+        <div>
+          <p class="eyebrow">RESIDENT PORTAL</p>
+          <h1>Welcome, <span id="resident-name">Resident</span>.</h1>
+        </div>
+        <div class="resident-date" id="resident-date"></div>
+      </header>
+
+      <p class="dashboard-message" id="resident-message"></p>
+
+      <section id="overview" class="resident-section active">
+        <div class="stat-grid">
+          <article class="stat-card">
+            <span>Approved</span>
+            <strong id="approval-status">—</strong>
+            <small>account status</small>
+          </article>
+          <article class="stat-card">
+            <span>Community</span>
+            <strong id="barangay-name">San Pascual</strong>
+            <small>barangay</small>
+          </article>
+          <article class="stat-card">
+            <span>Reports</span>
+            <strong id="report-count">0</strong>
+            <small>submitted cases</small>
+          </article>
+        </div>
+      </section>
+
+      <section id="profile" class="resident-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">PROFILE</p>
+            <h2>Resident information</h2>
+          </div>
+        </div>
+        <div class="profile-card">
+          <div class="profile-summary">
+            <div class="profile-avatar" id="resident-avatar">R</div>
+            <div>
+              <h3 id="full-name">Resident Name</h3>
+              <p id="resident-email">resident@example.com</p>
+            </div>
+          </div>
+          <div class="profile-grid">
+            <div><label>Age</label><p id="resident-age">—</p></div>
+            <div><label>Gender</label><p id="resident-gender">—</p></div>
+            <div><label>Birthdate</label><p id="resident-birthdate">—</p></div>
+            <div><label>Nationality</label><p id="resident-nationality">—</p></div>
+            <div><label>Contact</label><p id="resident-phone">—</p></div>
+            <div><label>Address</label><p id="resident-address">—</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="reports" class="resident-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">REPORTS</p>
+            <h2>My submitted infrastructure reports</h2>
+          </div>
+        </div>
+        <div class="report-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Category</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="resident-report-list">
+              <tr><td colspan="5" class="empty-state">No reports submitted yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="report-form" class="resident-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">INFRASTRUCTURE REPORT</p>
+            <h2>Submit a hazard report</h2>
+          </div>
+        </div>
+
+        <form id="infrastructure-form" class="report-form" novalidate>
+          <div class="form-grid">
+            <label class="field">
+              <span>What type of infrastructure?</span>
+              <select id="report-category" required>
+                <option value="">Select category</option>
+                <option value="roads">Roads and traffic</option>
+                <option value="drainage">Drainage and flooding</option>
+                <option value="water">Water and sanitation</option>
+                <option value="electricity">Electricity and power</option>
+                <option value="public-facility">Public facility</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Urgency level</span>
+              <select id="report-urgency" required>
+                <option value="">Select urgency</option>
+                <option value="LOW">Low</option>
+                <option value="MEDIUM" selected>Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Exact location</span>
+            <input id="report-location" type="text" placeholder="e.g. Purok 2, near Barangay Hall" required />
+          </label>
+
+          <label class="field">
+            <span>Brief description of the hazard</span>
+            <textarea id="report-description" rows="4" placeholder="Describe the issue in detail..." required></textarea>
+          </label>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Upload media</span>
+              <input id="report-media" type="file" accept="image/*,video/*" multiple />
+              <small class="field-hint">Up to 5 photos or videos. Remove any file before submitting.</small>
+            </label>
+
+            <label class="field">
+              <span>Date &amp; time submitted</span>
+              <input id="report-date" type="datetime-local" readonly required />
+            </label>
+          </div>
+
+          <div class="media-preview" id="media-preview" aria-live="polite"></div>
+
+          <div class="media-types">
+            <span>Accepted:</span>
+            <strong>Photo / Video</strong>
+            <span>Photo location data is checked when available.</span>
+          </div>
+
+          <button type="submit" class="submit-button" id="submit-report-button"><span>Submit report</span><span aria-hidden="true">→</span></button>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <div class="report-modal hidden" id="report-success-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+    <div class="report-modal-card">
+      <div class="report-modal-icon" id="report-modal-icon" aria-hidden="true">✓</div>
+      <p class="eyebrow" id="report-modal-kicker">REPORT RECEIVED</p>
+      <h2 id="report-modal-title">Your report was submitted.</h2>
+      <p id="report-modal-message">The barangay team can now review your infrastructure concern.</p>
+      <button type="button" class="submit-button" id="close-report-modal"><span id="close-report-modal-label">View my reports</span><span aria-hidden="true">→</span></button>
+    </div>
+  </div>
+
+  <script src="/config.js"></script>
+  <script src="/resident.js" defer></script>
+</body>
+</html>

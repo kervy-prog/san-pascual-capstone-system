@@ -48,11 +48,11 @@
             </div>
             <label class="field"><span>Middle name</span><input id="middle-name" type="text" autocomplete="additional-name" placeholder="Santos" /></label>
             <div class="details-grid">
-              <label class="field"><span>Age</span><input id="age" type="number" min="18" max="120" placeholder="18" /></label>
+              <label class="field"><span>Age</span><input id="age" type="number" min="18" max="120" placeholder="Auto-calculated" readonly /></label>
               <label class="field"><span>Gender</span><select id="gender"><option value="">Select gender</option><option value="FEMALE">Female</option><option value="MALE">Male</option><option value="NON_BINARY">Non-binary</option><option value="PREFER_NOT_TO_SAY">Prefer not to say</option></select></label>
             </div>
             <div class="details-grid">
-              <label class="field"><span>Birthdate</span><input id="birth-date" type="date" autocomplete="bday" /></label>
+              <label class="field"><span>Birthdate</span><input id="birth-date" type="date" autocomplete="bday" required /></label>
               <label class="field"><span>Nationality</span><input id="nationality" type="text" value="Filipino" autocomplete="country-name" /></label>
             </div>
             <label class="field"><span>Contact number</span><input id="phone" type="tel" autocomplete="tel" placeholder="09XX XXX XXXX" /></label>
@@ -89,6 +89,7 @@
         <p class="legal-copy">By continuing, you agree to use this service for legitimate barangay concerns.</p>
       </section>
     </main>
+    <script src="/config.js"></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

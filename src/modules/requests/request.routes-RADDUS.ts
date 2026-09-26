@@ -1,0 +1,135 @@
+import { Router } from "express";
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
+import multer from "multer";
+import { gps } from "exifr";
+import { z } from "zod";
+import { prisma } from "../../lib/prisma.js";
+import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
+import { isWithinSanPascualVicinity } from "./report-geofence.js";
+
+const router = Router();
+const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
+const reportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
+  fileFilter: (_request, file, callback) => callback(null, file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")),
+});
+const categoryNames: Record<string, string> = {
+  roads: "Roads and traffic",
+  drainage: "Drainage and flooding",
+  water: "Water and sanitation",
+  electricity: "Electricity and power",
+  "public-facility": "Public facility",
+  other: "Other",
+};
+
+const createRequestSchema = z.object({
+  categoryId: z.string().trim().min(1),
+  exactLocationLandmark: z.string().trim().min(5).max(500),
+  descriptionOfHazard: z.string().trim().min(10).max(5000),
+  currentStatus: z.string().trim().min(2).max(50),
+  residentId: z.string().cuid().optional(),
+  dateSubmitted: z.string().optional(),
+  submitAnonymously: z.preprocess((value) => value === true || value === "true", z.boolean()).optional(),
+  locationLatitude: z.coerce.number().min(-90).max(90).optional(),
+  locationLongitude: z.coerce.number().min(-180).max(180).optional(),
+});
+
+router.get("/", async (_request, response, next) => {
+  try {
+    const requests = await prisma.infrastructureReport.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        resident: { select: { id: true, firstName: true, lastName: true, email: true } },
+        category: true,
+        media: true,
+        actions: true,
+      },
+    });
+    response.json(requests);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/", requireAuth, reportUpload.array("media", 5), async (request: AuthRequest, response, next) => {
+  try {
+    const input = createRequestSchema.parse(request.body);
+    if (!request.userId) {
+      response.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    const category = await prisma.infrastructureCategory.findFirst({
+      where: {
+        OR: [
+          { id: input.categoryId },
+          ...(categoryNames[input.categoryId] ? [{ name: categoryNames[input.categoryId] }] : []),
+        ],
+      },
+    });
+    if (!category) {
+      response.status(400).json({ error: "Select a valid infrastructure report category." });
+      return;
+    }
+    const files = (request.files as Express.Multer.File[] | undefined) || [];
+    const imageFiles = files.filter((file) => file.mimetype.startsWith("image/"));
+    let photoLocation: { latitude: number; longitude: number } | undefined;
+
+    for (const file of imageFiles) {
+      const metadata = await gps(file.buffer).catch(() => undefined);
+      if (metadata && typeof metadata.latitude === "number" && typeof metadata.longitude === "number") {
+        photoLocation = metadata;
+        if (!isWithinSanPascualVicinity(metadata.latitude, metadata.longitude)) {
+          response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
+          return;
+        }
+      }
+    }
+
+    const submittedLocation = photoLocation || (input.locationLatitude !== undefined && input.locationLongitude !== undefined
+      ? { latitude: input.locationLatitude, longitude: input.locationLongitude }
+      : undefined);
+    if (submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
+      response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
+      return;
+    }
+
+    const created = await prisma.infrastructureReport.create({
+      data: {
+        categoryId: category.id,
+        exactLocationLandmark: input.exactLocationLandmark,
+        descriptionOfHazard: input.descriptionOfHazard,
+        currentStatus: input.currentStatus,
+        residentId: request.userId!,
+        submitAnonymously: input.submitAnonymously,
+        dateSubmitted: input.dateSubmitted ? new Date(input.dateSubmitted) : undefined,
+        ticketNumber: `SP-${Date.now().toString(36).toUpperCase()}`,
+        locationLatitude: submittedLocation?.latitude,
+        locationLongitude: submittedLocation?.longitude,
+      },
+    });
+
+    if (files.length > 0) {
+      await fs.mkdir(reportUploadDirectory, { recursive: true });
+      await prisma.reportMedia.createMany({
+        data: await Promise.all(files.map(async (file) => {
+          const extension = path.extname(file.originalname).toLowerCase() || ".bin";
+          const fileName = `${created.id}-${crypto.randomUUID()}${extension}`;
+          await fs.writeFile(path.join(reportUploadDirectory, fileName), file.buffer);
+          return {
+            reportId: created.id,
+            filePath: `/private-uploads/reports/${fileName}`,
+            mediaType: file.mimetype.startsWith("image/") ? "IMAGE" as const : "VIDEO" as const,
+          };
+        })),
+      });
+    }
+    response.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
+});
+
+export { router as requestRouter };

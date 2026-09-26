@@ -8,6 +8,7 @@ import multer from "multer";
 import { z } from "zod";
 import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
+import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 
 const router = Router();
 const uploadDirectory = path.resolve(process.cwd(), "private-uploads", "officials");
@@ -130,11 +131,11 @@ router.post("/signup", upload.fields([
       };
       await prisma.barangayOfficial.create({
         data: {
+          fullName: `${input.firstName} ${input.lastName}`,
           residentId: user.id,
-          fullName: `${input.firstName} ${input.middleName} ${input.lastName}`,
           designationPosition,
           contactNumber: input.phone,
-          userRole: input.role,
+          userRole: "STAFF",
           proofOfAppointment: await saveUpload(appointmentProofFile),
           identityVerification: `${governmentIdType}: ${governmentIdNumber} | ${await saveUpload(governmentIdFile)}`,
         },
@@ -166,6 +167,52 @@ router.post("/login", async (request, response, next) => {
     response.json({
       token: createToken(user.id, user.role),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, isVerified: user.isVerified, approvalStatus: user.approvalStatus },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/me", requireAuth, async (request: AuthRequest, response, next) => {
+  try {
+    const user = await prisma.resident.findUnique({
+      where: { id: request.userId! },
+      include: {
+        reports: {
+          orderBy: { dateSubmitted: "desc" },
+          include: { category: true, media: true },
+        },
+      },
+    });
+
+    if (!user) {
+      response.status(404).json({ error: "Resident account not found" });
+      return;
+    }
+
+    response.json({
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        middleName: user.middleName,
+        email: user.email,
+        phone: user.phone,
+        age: user.age,
+        gender: user.gender,
+        birthDate: user.birthDate,
+        nationality: user.nationality,
+        address: user.address,
+        barangay: user.barangay,
+        municipality: user.municipality,
+        province: user.province,
+        role: user.role,
+        isVerified: user.isVerified,
+        approvalStatus: user.approvalStatus,
+        privacyConsent: user.privacyConsent,
+        privacyConsentAt: user.privacyConsentAt,
+        reports: user.reports,
+      },
     });
   } catch (error) {
     next(error);

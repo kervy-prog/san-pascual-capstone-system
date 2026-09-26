@@ -1,0 +1,248 @@
+const API_BASE_URL = window.SAN_PASCUAL_API_URL || 'http://localhost:3000';
+const authStorage = sessionStorage.getItem('sanPascualToken') ? sessionStorage : localStorage;
+const token = authStorage.getItem('sanPascualToken');
+const storedUser = JSON.parse(authStorage.getItem('sanPascualUser') || 'null');
+const message = document.querySelector('#resident-message');
+const reportDateInput = document.querySelector('#report-date');
+const reportMediaInput = document.querySelector('#report-media');
+const mediaPreview = document.querySelector('#media-preview');
+const submitReportButton = document.querySelector('#submit-report-button');
+const reportSuccessModal = document.querySelector('#report-success-modal');
+const reportModalMessage = document.querySelector('#report-modal-message');
+const reportModalTitle = document.querySelector('#report-modal-title');
+const reportModalKicker = document.querySelector('#report-modal-kicker');
+const reportModalIcon = document.querySelector('#report-modal-icon');
+const closeReportModalLabel = document.querySelector('#close-report-modal-label');
+let selectedMediaFiles = [];
+
+function showReportModal({ error = false, message: modalMessage }) {
+  reportSuccessModal.classList.toggle('error', error);
+  reportModalIcon.textContent = error ? '!' : '✓';
+  reportModalKicker.textContent = error ? 'REPORT NOT SUBMITTED' : 'REPORT RECEIVED';
+  reportModalTitle.textContent = error ? 'Unable to submit report.' : 'Your report was submitted.';
+  reportModalMessage.textContent = modalMessage;
+  closeReportModalLabel.textContent = error ? 'Close' : 'View my reports';
+  reportSuccessModal.classList.remove('hidden');
+}
+
+function showReportMessage(text, isError = false) {
+  message.textContent = text;
+  message.classList.toggle('error', isError);
+  message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function renderMediaPreview() {
+  mediaPreview.innerHTML = '';
+  selectedMediaFiles.forEach((file, index) => {
+    const item = document.createElement('div');
+    item.className = 'media-preview-item';
+    const preview = file.type.startsWith('image/') ? document.createElement('img') : document.createElement('video');
+    preview.src = URL.createObjectURL(file);
+    preview.alt = file.name;
+    if (preview.tagName === 'VIDEO') preview.controls = true;
+    const details = document.createElement('div');
+    details.className = 'media-preview-details';
+    details.innerHTML = `<strong>${file.name}</strong><small>${Math.ceil(file.size / 1024)} KB</small>`;
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'media-remove';
+    removeButton.textContent = 'Remove';
+    removeButton.addEventListener('click', () => {
+      selectedMediaFiles.splice(index, 1);
+      renderMediaPreview();
+    });
+    item.append(preview, details, removeButton);
+    mediaPreview.append(item);
+  });
+}
+
+reportMediaInput.addEventListener('change', () => {
+  const incomingFiles = Array.from(reportMediaInput.files || []);
+  const availableSlots = 5 - selectedMediaFiles.length;
+  selectedMediaFiles.push(...incomingFiles.slice(0, availableSlots));
+  if (incomingFiles.length > availableSlots) {
+    showReportMessage('You can upload a maximum of 5 media files.', true);
+  }
+  reportMediaInput.value = '';
+  renderMediaPreview();
+});
+
+function closeReportModal() {
+  reportSuccessModal.classList.add('hidden');
+}
+
+document.querySelector('#close-report-modal').addEventListener('click', () => {
+  const isError = reportSuccessModal.classList.contains('error');
+  closeReportModal();
+  if (!isError) document.querySelector('a[href="#reports"]').click();
+});
+
+function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Location services are unavailable in this browser.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+      () => reject(new Error('Location permission was unavailable.')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  });
+}
+
+function autoFillSubmissionDateTime() {
+  if (!reportDateInput) return;
+  const now = new Date();
+  const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+  reportDateInput.value = localTime;
+}
+
+autoFillSubmissionDateTime();
+
+if (!token || !storedUser || storedUser.role !== 'RESIDENT') {
+  window.location.replace('/');
+}
+
+document.querySelector('#resident-name').textContent = storedUser?.firstName || 'Resident';
+document.querySelector('#resident-date').textContent = new Intl.DateTimeFormat('en-PH', { dateStyle: 'long' }).format(new Date());
+document.querySelector('#resident-logout').addEventListener('click', () => {
+  localStorage.removeItem('sanPascualToken');
+  localStorage.removeItem('sanPascualUser');
+  sessionStorage.removeItem('sanPascualToken');
+  sessionStorage.removeItem('sanPascualUser');
+  window.location.replace('/');
+});
+
+document.querySelectorAll('nav a').forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    const targetId = link.getAttribute('href');
+    if (!targetId) return;
+    document.querySelectorAll('nav a').forEach((item) => item.classList.toggle('active', item === link));
+    document.querySelectorAll('.resident-section').forEach((section) => {
+      section.classList.toggle('active', `#${section.id}` === targetId);
+    });
+    history.replaceState(null, '', targetId);
+  });
+});
+
+document.querySelector('#infrastructure-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const mediaFiles = [...selectedMediaFiles];
+  const submittedAt = reportDateInput?.value ? new Date(reportDateInput.value).toISOString() : new Date().toISOString();
+  const categoryId = document.querySelector('#report-category').value;
+  const urgencyLevel = document.querySelector('#report-urgency').value;
+  const exactLocationLandmark = document.querySelector('#report-location').value.trim();
+  const descriptionOfHazard = document.querySelector('#report-description').value.trim();
+  const payload = new FormData();
+  payload.append('categoryId', categoryId);
+  payload.append('exactLocationLandmark', exactLocationLandmark);
+  payload.append('descriptionOfHazard', descriptionOfHazard);
+  payload.append('currentStatus', 'SUBMITTED');
+  payload.append('dateSubmitted', submittedAt);
+  payload.append('submitAnonymously', 'false');
+  mediaFiles.forEach((file) => payload.append('media', file));
+
+  if (!categoryId || !urgencyLevel || !exactLocationLandmark || !descriptionOfHazard || !reportDateInput?.value) {
+    showReportMessage('Please choose a category and urgency, then complete the location and description.', true);
+    return;
+  }
+  if (exactLocationLandmark.length < 5) {
+    showReportMessage('Location must be at least 5 characters long.', true);
+    return;
+  }
+  if (descriptionOfHazard.length < 10) {
+    showReportMessage('Please describe the hazard using at least 10 characters.', true);
+    return;
+  }
+
+  message.classList.remove('error');
+  submitReportButton.disabled = true;
+  submitReportButton.querySelector('span').textContent = 'Submitting...';
+  try {
+    if (mediaFiles.length > 0) {
+      try {
+        const currentLocation = await getCurrentLocation();
+        payload.append('locationLatitude', String(currentLocation.latitude));
+        payload.append('locationLongitude', String(currentLocation.longitude));
+      } catch {
+        // The server will still inspect the image's EXIF GPS metadata.
+      }
+    }
+    const response = await fetch(`${API_BASE_URL}/api/requests`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: payload,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const validationDetails = data.details
+        ? Object.values(data.details).flat().filter(Boolean).join(' ')
+        : '';
+      throw new Error(validationDetails || data.error || 'Unable to submit infrastructure report.');
+    }
+
+    showReportMessage('Infrastructure report submitted successfully.');
+    showReportModal({ message: `Ticket ${data.ticketNumber || 'created'} has been recorded. The barangay team can now review your concern.` });
+    form.reset();
+    selectedMediaFiles = [];
+    renderMediaPreview();
+    autoFillSubmissionDateTime();
+    await fetchResidentProfile();
+  } catch (error) {
+    showReportMessage(error.message, true);
+    if (error.message === "Sorry, the uploaded image isn't part of our Barangay") {
+      showReportModal({ error: true, message: error.message });
+    }
+  } finally {
+    submitReportButton.disabled = false;
+    submitReportButton.querySelector('span').textContent = 'Submit report';
+  }
+});
+
+async function fetchResidentProfile() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to load resident profile');
+
+    const resident = data.user;
+    document.querySelector('#resident-name').textContent = resident.firstName;
+    document.querySelector('#resident-avatar').textContent = resident.firstName[0] || 'R';
+    document.querySelector('#full-name').textContent = `${resident.firstName} ${resident.middleName} ${resident.lastName}`;
+    document.querySelector('#resident-email').textContent = resident.email;
+    document.querySelector('#resident-age').textContent = resident.age;
+    document.querySelector('#resident-gender').textContent = resident.gender?.replace('_', ' ');
+    document.querySelector('#resident-birthdate').textContent = new Date(resident.birthDate).toLocaleDateString('en-PH');
+    document.querySelector('#resident-nationality').textContent = resident.nationality;
+    document.querySelector('#resident-phone').textContent = resident.phone;
+    document.querySelector('#resident-address').textContent = resident.address;
+    document.querySelector('#approval-status').textContent = resident.approvalStatus;
+    document.querySelector('#barangay-name').textContent = resident.barangay || 'San Pascual';
+    document.querySelector('#report-count').textContent = resident.reports?.length || 0;
+
+    const rows = resident.reports?.length ? resident.reports.map((report) => `
+      <tr>
+        <td>${report.ticketNumber || report.id}</td>
+        <td>${report.category?.name || 'N/A'}</td>
+        <td>${report.exactLocationLandmark || 'N/A'}</td>
+        <td>${report.status || report.currentStatus || 'SUBMITTED'}</td>
+        <td>${new Date(report.dateSubmitted || report.createdAt).toLocaleDateString('en-PH')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="5" class="empty-state">No reports submitted yet.</td></tr>';
+    document.querySelector('#resident-report-list').innerHTML = rows;
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+  }
+}
+
+fetchResidentProfile();
+setInterval(fetchResidentProfile, 10000);

@@ -1,3 +1,4 @@
+const API_BASE_URL = window.SAN_PASCUAL_API_URL || 'http://localhost:3000';
 const state = { mode: 'login', role: 'RESIDENT' };
 const form = document.querySelector('#auth-form');
 const message = document.querySelector('#form-message');
@@ -5,6 +6,64 @@ const submitButton = document.querySelector('#submit-button');
 const submitLabel = document.querySelector('#submit-label');
 const password = document.querySelector('#password');
 const confirmPassword = document.querySelector('#confirm-password');
+const birthDateInput = document.querySelector('#birth-date');
+const ageInput = document.querySelector('#age');
+const emailInput = document.querySelector('#email');
+const rememberInput = document.querySelector('#remember');
+
+function redirectToRememberedSession() {
+  const storage = sessionStorage.getItem('sanPascualToken') ? sessionStorage : localStorage;
+  const token = storage.getItem('sanPascualToken');
+  const storedUser = JSON.parse(storage.getItem('sanPascualUser') || 'null');
+  if (!token || !storedUser) return;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 <= Date.now()) {
+      storage.removeItem('sanPascualToken');
+      storage.removeItem('sanPascualUser');
+      return;
+    }
+  } catch {
+    storage.removeItem('sanPascualToken');
+    storage.removeItem('sanPascualUser');
+    return;
+  }
+
+  const destination = storedUser.role === 'ADMIN'
+    ? '/admin.html'
+    : storedUser.role === 'STAFF' ? '/official.html' : '/resident.html';
+  window.location.replace(destination);
+}
+
+const rememberedEmail = localStorage.getItem('sanPascualEmail');
+if (rememberedEmail) {
+  emailInput.value = rememberedEmail;
+  rememberInput.checked = true;
+}
+
+redirectToRememberedSession();
+
+function updateAgeFromBirthDate() {
+  if (!birthDateInput || !ageInput) return;
+  if (!birthDateInput.value) {
+    ageInput.value = '';
+    return;
+  }
+
+  const birthDate = new Date(`${birthDateInput.value}T00:00:00`);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const birthdayHasPassed = today.getMonth() > birthDate.getMonth()
+    || (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+  if (!birthdayHasPassed) age -= 1;
+  ageInput.value = age >= 0 ? String(age) : '';
+}
+
+if (birthDateInput) {
+  birthDateInput.max = new Date().toISOString().slice(0, 10);
+  birthDateInput.addEventListener('change', updateAgeFromBirthDate);
+}
 
 function setMessage(text, success = false) {
   message.textContent = text;
@@ -47,6 +106,8 @@ document.querySelectorAll('.role-option').forEach((button) => button.addEventLis
   document.querySelector('#official-fields').classList.toggle('hidden', !(state.mode === 'signup' && state.role === 'STAFF'));
 }));
 
+updateMode(state.mode);
+
 document.querySelector('#password-toggle').addEventListener('click', (event) => {
   const visible = password.type === 'text';
   password.type = visible ? 'password' : 'text';
@@ -75,6 +136,7 @@ form.addEventListener('submit', async (event) => {
 
   const payload = { email, password: passwordValue };
   if (state.mode === 'signup') {
+    updateAgeFromBirthDate();
     if (!/[a-z]/.test(passwordValue) || !/[A-Z]/.test(passwordValue) || !/[0-9]/.test(passwordValue) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(passwordValue)) {
       setMessage('Password must include uppercase, lowercase, a number, and a special character such as !, @, #, $, %, & or *.');
       return;
@@ -86,7 +148,7 @@ form.addEventListener('submit', async (event) => {
     payload.firstName = document.querySelector('#first-name').value.trim();
     payload.lastName = document.querySelector('#last-name').value.trim();
     payload.middleName = document.querySelector('#middle-name').value.trim();
-    payload.age = document.querySelector('#age').value;
+    payload.age = ageInput.value;
     payload.gender = document.querySelector('#gender').value;
     payload.birthDate = document.querySelector('#birth-date').value;
     payload.nationality = document.querySelector('#nationality').value.trim();
@@ -127,14 +189,43 @@ form.addEventListener('submit', async (event) => {
         requestBody.append('appointmentProofFile', document.querySelector('#appointment-proof-file').files[0]);
       }
     }
-    const response = await fetch(`/api/auth/${state.mode}`, { method: 'POST', ...(state.mode === 'login' ? { headers: { 'Content-Type': 'application/json' } } : {}), body: requestBody });
+    const response = await fetch(`${API_BASE_URL}/api/auth/${state.mode}`, { method: 'POST', ...(state.mode === 'login' ? { headers: { 'Content-Type': 'application/json' } } : {}), body: requestBody });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Unable to complete this request.');
-    localStorage.setItem('sanPascualUser', JSON.stringify(data.user));
-    if (data.token) localStorage.setItem('sanPascualToken', data.token);
-    if (data.user.role === 'ADMIN') window.location.replace('/admin.html');
-    setMessage(data.pendingApproval ? 'Your account was submitted for approval. Access will be available after barangay verification.' : `Welcome, ${data.user.firstName}. Your ${roleLabel(data.user.role)} account is ready.`, true);
-    submitLabel.textContent = 'Access granted';
+    localStorage.removeItem('sanPascualToken');
+    localStorage.removeItem('sanPascualUser');
+    sessionStorage.removeItem('sanPascualToken');
+    sessionStorage.removeItem('sanPascualUser');
+    if (state.mode === 'signup' || data.pendingApproval || !data.token) {
+      updateMode('login');
+      emailInput.value = email;
+      password.value = '';
+      if (confirmPassword) confirmPassword.value = '';
+      setMessage(data.message || 'Your account was submitted for approval. Access will be available after barangay verification.', true);
+      submitLabel.textContent = 'Continue to your desk';
+      return;
+    }
+
+    const authStorage = rememberInput.checked ? localStorage : sessionStorage;
+    authStorage.setItem('sanPascualUser', JSON.stringify(data.user));
+    if (data.token) authStorage.setItem('sanPascualToken', data.token);
+    if (rememberInput.checked) {
+      localStorage.setItem('sanPascualEmail', email);
+    } else {
+      localStorage.removeItem('sanPascualEmail');
+    }
+    if (data.user.role === 'ADMIN') {
+      window.location.replace('/admin.html');
+      return;
+    }
+    if (data.user.role === 'RESIDENT') {
+      window.location.replace('/resident.html');
+      return;
+    }
+    if (data.user.role === 'STAFF') {
+      window.location.replace('/official.html');
+      return;
+    }
   } catch (error) {
     setMessage(error.message);
     submitLabel.textContent = state.mode === 'signup' ? 'Create my account' : 'Continue to your desk';

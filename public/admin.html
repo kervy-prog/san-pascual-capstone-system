@@ -11,17 +11,38 @@
     <aside class="admin-sidebar">
       <div class="admin-brand"><span>SP</span><div><strong>San Pascual</strong><small>Admin desk</small></div></div>
       <div class="admin-lock"><span>◆</span><div><strong>Restricted area</strong><small>Admin access only</small></div></div>
-      <nav><a class="active" href="#overview">Overview</a><a href="#approvals">Approvals <b id="nav-pending">0</b></a><a href="#reports">Infrastructure reports</a></nav>
+      <nav>
+        <a class="active" href="#overview" data-target="overview">Overview</a>
+        <a href="#approvals" data-target="approvals">Approvals <b id="nav-pending">0</b></a>
+        <a href="#report-approvals" data-target="report-approvals">Report approval <b id="nav-report-pending">0</b></a>
+        <a href="#residents" data-target="residents">Barangay Residents</a>
+        <a href="#officials" data-target="officials">Barangay Officials</a>
+        <a href="#reports" data-target="reports">Infrastructure reports</a>
+      </nav>
       <button class="logout-button" id="logout-button">Sign out <span>↗</span></button>
     </aside>
     <section class="admin-content">
       <header class="admin-header"><div><p class="eyebrow">ADMINISTRATION · SAN PASCUAL</p><h1>Good day, <span id="admin-name">Admin</span>.</h1><p>Review access, protect resident data, and keep infrastructure action visible.</p></div><div class="admin-date" id="admin-date"></div></header>
       <p class="dashboard-message" id="dashboard-message"></p>
-      <section class="stat-grid"><article class="stat-card"><span>Residents</span><strong id="resident-count">—</strong><small>registered accounts</small></article><article class="stat-card"><span>Officials</span><strong id="official-count">—</strong><small>official profiles</small></article><article class="stat-card"><span>Reports</span><strong id="report-count">—</strong><small>infrastructure records</small></article><article class="stat-card highlight"><span>Needs review</span><strong id="pending-count">—</strong><small>awaiting approval</small></article></section>
-      <section class="dashboard-section" id="approvals"><div class="section-heading"><div><p class="eyebrow">ACCESS CONTROL</p><h2>Pending approvals</h2></div><span class="section-count" id="approval-count">0</span></div><div class="approval-list" id="approval-list"><div class="empty-state">Loading approvals...</div></div></section>
-      <section class="dashboard-section" id="reports"><div class="section-heading"><div><p class="eyebrow">FIELD OPERATIONS</p><h2>Infrastructure reports</h2></div></div><div class="report-table-wrap"><table><thead><tr><th>Ticket</th><th>Concern</th><th>Resident</th><th>Status</th><th>Submitted</th></tr></thead><tbody id="report-list"><tr><td colspan="5" class="empty-state">Loading reports...</td></tr></tbody></table></div></section>
+      <section id="overview" class="admin-section active">
+        <div class="stat-grid"><article class="stat-card"><span>Residents</span><strong id="resident-count">—</strong><small>registered accounts</small></article><article class="stat-card"><span>Officials</span><strong id="official-count">—</strong><small>official profiles</small></article><article class="stat-card highlight"><span>Needs review</span><strong id="pending-count">—</strong><small>awaiting approval</small></article></div>
+        <article class="progress-card"><div class="section-heading"><div><p class="eyebrow">REPORT PROGRESS</p><h2>Infrastructure reports</h2></div><span class="progress-total"><strong id="report-progress-total">0</strong> total</span></div><div class="progress-chart" role="img" aria-label="Infrastructure report progress chart"><div class="progress-row"><div class="progress-label"><span>Done</span><strong id="report-done-count">0</strong></div><div class="progress-track"><span id="report-done-bar" class="progress-bar done"></span></div></div><div class="progress-row"><div class="progress-label"><span>Ongoing</span><strong id="report-ongoing-count">0</strong></div><div class="progress-track"><span id="report-ongoing-bar" class="progress-bar ongoing"></span></div></div><div class="progress-row"><div class="progress-label"><span>Unfinished</span><strong id="report-unfinished-count">0</strong></div><div class="progress-track"><span id="report-unfinished-bar" class="progress-bar unfinished"></span></div></div></div></article>
+      </section>
+      <section class="dashboard-section admin-section" id="approvals"><div class="section-heading"><div><p class="eyebrow">ACCESS CONTROL</p><h2>Pending approvals</h2></div><span class="section-count" id="approval-count">0</span></div><div class="approval-list" id="approval-list"><div class="empty-state">Loading approvals...</div></div></section>
+      <section class="dashboard-section admin-section" id="report-approvals"><div class="section-heading"><div><p class="eyebrow">REPORT VERIFICATION</p><h2>Report approval</h2></div><span class="section-count" id="report-approval-count">0</span></div><div class="approval-list" id="report-approval-list"><div class="empty-state">Loading report approvals...</div></div></section>
+      <section class="dashboard-section admin-section" id="residents"><div class="section-heading"><div><p class="eyebrow">RESIDENT DATA</p><h2>Barangay Residents database</h2></div></div><div class="report-table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Contact</th><th>Address</th><th>Gender</th><th>Approved</th><th>Action</th></tr></thead><tbody id="resident-list"><tr><td colspan="7"></td></tr></tbody></table></div></section>
+      <section class="dashboard-section admin-section" id="officials"><div class="section-heading"><div><p class="eyebrow">OFFICIAL DIRECTORY</p><h2>Barangay Officials</h2></div><span class="section-count" id="official-directory-count">0</span></div><div class="report-table-wrap"><table><thead><tr><th>Name</th><th>Designation</th><th>Status</th><th>Email</th><th>Contact</th><th>Address</th><th>Action</th></tr></thead><tbody id="official-list"><tr><td colspan="7"></td></tr></tbody></table></div></section>
+      <section class="dashboard-section admin-section" id="reports"><div class="section-heading"><div><p class="eyebrow">FIELD OPERATIONS</p><h2>Infrastructure reports database</h2></div></div><div class="report-table-wrap"><table><thead><tr><th>Report ID</th><th>Ticket Number</th><th>Resident</th><th>Category</th><th>Urgency</th><th>Exact Location</th><th>Description</th><th>Assigned official</th><th>Current Status</th><th>Media</th><th>Date Submitted</th></tr></thead><tbody id="report-list"><tr><td colspan="11"></td></tr></tbody></table></div></section>
     </section>
   </main>
+  <div class="media-modal hidden" id="report-media-modal" role="dialog" aria-modal="true" aria-labelledby="report-media-title">
+    <div class="media-modal-card">
+      <div class="section-heading"><h2 id="report-media-title">Report image</h2><button type="button" class="media-modal-close" id="close-report-media">Close</button></div>
+      <img id="report-media-image" alt="Uploaded infrastructure report" />
+      <p id="report-media-location" class="report-media-location"></p>
+    </div>
+  </div>
+  <script src="/config.js"></script>
   <script src="/admin.js" defer></script>
 </body>
 </html>

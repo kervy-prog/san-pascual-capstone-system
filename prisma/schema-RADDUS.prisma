@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  RESIDENT
+  STAFF
+  ADMIN
+}
+
+enum RequestType {
+  COMPLAINT
+  SERVICE_REQUEST
+}
+
+enum RequestStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+  CANCELLED
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum ReportStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+  CANCELLED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OfficialStatus {
+  ACTIVE
+  RETIRED
+  NOT_ON_DUTY
+}
+
+model Resident {
+  id           String          @id @default(cuid())
+  firstName    String
+  lastName     String
+  middleName   String
+  age          Int
+  gender       Gender
+  birthDate    DateTime
+  nationality  String
+  email        String          @unique
+  phone        String
+  address      String
+  barangay     String          @default("San Pascual")
+  municipality String          @default("San Narciso")
+  province     String          @default("Zambales")
+  passwordHash String
+  role         UserRole        @default(RESIDENT)
+  isVerified   Boolean         @default(false)
+  approvalStatus ApprovalStatus @default(PENDING)
+  privacyConsent Boolean        @default(false)
+  privacyConsentAt DateTime?
+  reports      InfrastructureReport[]
+  officialProfile BarangayOfficial?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model InfrastructureCategory {
+  id          String                   @id @default(cuid())
+  name        String                   @unique
+  description String
+  urgencyLevel String
+  reports     InfrastructureReport[]
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+}
+
+model InfrastructureReport {
+  id            String        @id @default(cuid())
+  reportId      String        @unique @default(cuid())
+  residentId    String
+  categoryId    String
+  exactLocationLandmark String
+  descriptionOfHazard    String
+  currentStatus          String
+  submitAnonymously      Boolean       @default(false)
+  dateSubmitted          DateTime      @default(now())
+  ticketNumber           String        @unique
+  status                 ReportStatus  @default(SUBMITTED)
+  resident               Resident      @relation(fields: [residentId], references: [id])
+  category               InfrastructureCategory @relation(fields: [categoryId], references: [id])
+  media                  ReportMedia[]
+  actions                BarangayAction[]
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+}
+
+model ReportMedia {
+  id         String               @id @default(cuid())
+  mediaId    String               @unique @default(cuid())
+  reportId   String
+  filePath   String
+  mediaType  MediaType
+  uploadedAt DateTime             @default(now())
+  report     InfrastructureReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model BarangayOfficial {
+  id                 String           @id @default(cuid())
+  actionId           String           @unique @default(cuid())
+  fullName           String
+  designationPosition String
+  contactNumber      String
+  userRole           String
+  status             OfficialStatus @default(ACTIVE)
+  proofOfAppointment String
+  identityVerification String
+  residentId         String           @unique
+  resident           Resident         @relation(fields: [residentId], references: [id])
+  actions            BarangayAction[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model BarangayAction {
+  id           String               @id @default(cuid())
+  actionId     String               @unique @default(cuid())
+  reportId     String
+  officialId   String
+  actionStatus String
+  actionRemarks String
+  actionDate   DateTime             @default(now())
+  report       InfrastructureReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  official     BarangayOfficial     @relation(fields: [officialId], references: [id])
+}

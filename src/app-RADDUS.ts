@@ -4,7 +4,7 @@ import helmet from "helmet";
 import { prisma } from "./lib/prisma.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
-import { requestRouter } from "./modules/requests/request.routes-RADDUS.js";
+import { requestRouter } from "./modules/requests/request.routes.js";
 import { officialRouter } from "./modules/official/official.routes.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
