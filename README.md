@@ -51,6 +51,8 @@ Backend foundation for the infrastructure complaint and service request manageme
 
    The admin defaults are `admin@sanpascual.gov.ph` and `AdminPass123!`; set `ADMIN_EMAIL` and `ADMIN_PASSWORD` first to use different values.
 
+   To add approximate pins to older image reports that were submitted before geolocation was enabled, run `npm run reports:geocode`.
+
 6. Start the API and frontend in separate terminals:
 
    ```bash
