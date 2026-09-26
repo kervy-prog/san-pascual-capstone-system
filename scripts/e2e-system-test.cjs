@@ -275,6 +275,12 @@ async function run() {
   });
   await assert(deleteRes.status === 204, "Admin successfully deletes resident account and associated data without constraint failure");
 
+  const deleteOfficialRes = await fetch(`${BASE_URL}/api/admin/accounts/${officialUserId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  await assert(deleteOfficialRes.status === 204, "Admin removes the synthetic official test account");
+
   console.log("\n==============================================");
   console.log("🎉 ALL TESTS PASSED! SYSTEM RUNS FLAWLESSLY!");
   console.log("==============================================");
