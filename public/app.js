@@ -85,9 +85,11 @@ function updateMode(mode) {
   document.querySelector('#form-title').textContent = signup ? 'Create your account' : 'Sign in to your desk';
   document.querySelector('#form-subtitle').textContent = signup ? 'Choose your role and get started with San Pascual Connect.' : 'Track requests, report concerns, and stay connected.';
   document.querySelector('#password-hint').textContent = signup ? '8 characters minimum' : '';
+  password.autocomplete = signup ? 'new-password' : 'current-password';
   document.querySelector('#password-rules').classList.toggle('hidden', !signup);
   document.querySelector('#confirm-password-field').classList.toggle('hidden', !signup);
   document.querySelector('#official-fields').classList.toggle('hidden', !(signup && state.role === 'STAFF'));
+  document.querySelector('#residency-id-field').classList.toggle('hidden', !(signup && state.role === 'RESIDENT'));
   document.querySelector('.privacy-consent').classList.toggle('hidden', !signup);
   document.querySelector('.login-only-role').classList.toggle('hidden', signup);
   document.querySelector('#forgot-button').classList.toggle('hidden', signup);
@@ -104,6 +106,7 @@ document.querySelectorAll('.role-option').forEach((button) => button.addEventLis
     option.setAttribute('aria-checked', String(active));
   });
   document.querySelector('#official-fields').classList.toggle('hidden', !(state.mode === 'signup' && state.role === 'STAFF'));
+  document.querySelector('#residency-id-field').classList.toggle('hidden', !(state.mode === 'signup' && state.role === 'RESIDENT'));
 }));
 
 updateMode(state.mode);
@@ -161,8 +164,9 @@ form.addEventListener('submit', async (event) => {
     payload.privacyConsent = document.querySelector('#privacy-consent').checked;
     payload.role = state.role;
     payload.confirmPassword = confirmPassword.value;
-    if (!payload.firstName || !payload.lastName || !payload.middleName || !payload.age || !payload.gender || !payload.birthDate || !payload.nationality || !payload.phone || !payload.address || !payload.residencyConfirmed || !payload.privacyConsent) {
-      setMessage('Complete all required information, residency confirmation, and privacy consent.');
+    const residencyIdFile = document.querySelector('#residency-id-file').files[0];
+    if (!payload.firstName || !payload.lastName || !payload.middleName || !payload.age || !payload.gender || !payload.birthDate || !payload.nationality || !payload.phone || !payload.address || !payload.residencyConfirmed || !payload.privacyConsent || (state.role === 'RESIDENT' && !residencyIdFile)) {
+      setMessage('Complete all required information, upload proof of residency, and provide the required confirmations.');
       return;
     }
     if (state.role === 'STAFF') {
@@ -184,6 +188,7 @@ form.addEventListener('submit', async (event) => {
     const requestBody = state.mode === 'signup' ? new FormData() : JSON.stringify(payload);
     if (state.mode === 'signup') {
       Object.entries(payload).forEach(([key, value]) => requestBody.append(key, String(value)));
+      if (state.role === 'RESIDENT') requestBody.append('residencyIdFile', residencyIdFile);
       if (state.role === 'STAFF') {
         requestBody.append('governmentIdFile', document.querySelector('#government-id-file').files[0]);
         requestBody.append('appointmentProofFile', document.querySelector('#appointment-proof-file').files[0]);

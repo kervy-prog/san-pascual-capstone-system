@@ -1,1 +1,1 @@
-window.SAN_PASCUAL_API_URL = window.location.origin;
+window.SAN_PASCUAL_API_URL = "" || window.location.origin;

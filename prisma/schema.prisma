@@ -113,6 +113,7 @@ model Resident {
   approvalStatus   ApprovalStatus         @default(PENDING)
   privacyConsent   Boolean                @default(false)
   privacyConsentAt DateTime?
+  residencyIdFile  String?
   reports          InfrastructureReport[]
   officialProfile  BarangayOfficial?
   createdAt        DateTime               @default(now())

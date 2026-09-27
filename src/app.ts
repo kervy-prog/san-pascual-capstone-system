@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import { env } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
@@ -11,7 +12,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 export const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: env.CORS_ORIGIN || true }));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_request, response) => {

@@ -7,6 +7,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(16).default("development-jwt-secret-change-me"),
+  CORS_ORIGIN: z.string().url().optional(),
   SEMAPHORE_API_KEY: z.string().min(1).optional(),
   SEMAPHORE_SENDER_NAME: z.string().min(1).max(11).default("SANPASCUAL"),
 });

@@ -22,7 +22,7 @@ router.get("/overview", async (_request, response, next) => {
       prisma.infrastructureReport.groupBy({ by: ["status"], _count: { _all: true } }),
       prisma.resident.findMany({
         where: { role: "RESIDENT", approvalStatus: "PENDING" },
-        select: { id: true, firstName: true, lastName: true, middleName: true, email: true, phone: true, address: true, barangay: true, municipality: true, province: true, nationality: true, privacyConsentAt: true, createdAt: true, approvalStatus: true },
+        select: { id: true, firstName: true, lastName: true, middleName: true, email: true, phone: true, address: true, barangay: true, municipality: true, province: true, nationality: true, residencyIdFile: true, privacyConsentAt: true, createdAt: true, approvalStatus: true },
         orderBy: { createdAt: "asc" },
       }),
       prisma.resident.findMany({
@@ -135,6 +135,16 @@ router.get("/officials/documents/:fileName", (request, response) => {
   const filePath = path.resolve(process.cwd(), "private-uploads", "officials", fileName);
   if (!fs.existsSync(filePath)) {
     response.status(404).json({ error: "Document not found" });
+    return;
+  }
+  response.sendFile(filePath);
+});
+
+router.get("/residents/documents/:fileName", (request, response) => {
+  const fileName = path.basename(request.params.fileName);
+  const filePath = path.resolve(process.cwd(), "private-uploads", "residents", fileName);
+  if (!fs.existsSync(filePath)) {
+    response.status(404).json({ error: "Resident document not found" });
     return;
   }
   response.sendFile(filePath);

@@ -12,6 +12,7 @@ import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js"
 
 const router = Router();
 const uploadDirectory = path.resolve(process.cwd(), "private-uploads", "officials");
+const residentUploadDirectory = path.resolve(process.cwd(), "private-uploads", "residents");
 const allowedUploadTypes = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -63,6 +64,7 @@ function createToken(userId: string, role: string) {
 }
 
 router.post("/signup", upload.fields([
+  { name: "residencyIdFile", maxCount: 1 },
   { name: "governmentIdFile", maxCount: 1 },
   { name: "appointmentProofFile", maxCount: 1 },
 ]), async (request, response, next) => {
@@ -73,13 +75,14 @@ router.post("/signup", upload.fields([
       return;
     }
     const files = request.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const residencyIdFile = files?.residencyIdFile?.[0];
     const governmentIdFile = files?.governmentIdFile?.[0];
     const appointmentProofFile = files?.appointmentProofFile?.[0];
     if (input.role === "STAFF" && (!input.designationPosition || !input.governmentIdType || !input.governmentIdNumber || !governmentIdFile || !appointmentProofFile)) {
       response.status(400).json({ error: "Barangay official accounts require designation, government ID details, an ID upload, and proof of appointment or oath of office" });
       return;
     }
-    if (input.role === "RESIDENT" && (!input.residencyConfirmed || input.nationality.toLowerCase() !== "filipino" || input.barangay.toLowerCase() !== "san pascual" || input.municipality.toLowerCase() !== "san narciso" || input.province.toLowerCase() !== "zambales")) {
+    if (input.role === "RESIDENT" && (!input.residencyConfirmed || !residencyIdFile || input.nationality.toLowerCase() !== "filipino" || input.barangay.toLowerCase() !== "san pascual" || input.municipality.toLowerCase() !== "san narciso" || input.province.toLowerCase() !== "zambales")) {
       response.status(400).json({ error: "Resident accounts are limited to Filipino citizens residing in Barangay San Pascual, San Narciso, Zambales" });
       return;
     }
@@ -91,6 +94,14 @@ router.post("/signup", upload.fields([
     }
 
     const passwordHash = await bcrypt.hash(input.password, 12);
+    let residencyIdPath: string | undefined;
+    if (input.role === "RESIDENT" && residencyIdFile) {
+      await fs.mkdir(residentUploadDirectory, { recursive: true });
+      const extension = path.extname(residencyIdFile.originalname).toLowerCase() || ".bin";
+      const fileName = `${crypto.randomUUID()}${extension}`;
+      await fs.writeFile(path.join(residentUploadDirectory, fileName), residencyIdFile.buffer);
+      residencyIdPath = `/uploads/residents/${fileName}`;
+    }
     const user = await prisma.resident.create({
       data: {
         firstName: input.firstName,
@@ -110,6 +121,7 @@ router.post("/signup", upload.fields([
         role: input.role,
         privacyConsent: input.privacyConsent,
         privacyConsentAt: new Date(),
+        residencyIdFile: residencyIdPath,
       },
       select: { id: true, firstName: true, lastName: true, email: true, role: true, isVerified: true, approvalStatus: true },
     });

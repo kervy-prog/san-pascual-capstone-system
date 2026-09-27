@@ -1,0 +1,1 @@
+ALTER TABLE "Resident" ADD COLUMN "residencyIdFile" TEXT;
