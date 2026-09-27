@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAdmin } from "../../middleware/require-admin.js";
+import { sendStoredFile } from "../../lib/file-storage.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -122,32 +123,23 @@ router.get("/reports", async (_request, response, next) => {
 
 router.get("/reports/media/:fileName", (request, response) => {
   const fileName = path.basename(request.params.fileName);
-  const filePath = path.resolve(process.cwd(), "private-uploads", "reports", fileName);
-  if (!fs.existsSync(filePath)) {
-    response.status(404).json({ error: "Report media not found" });
-    return;
-  }
-  response.sendFile(filePath);
+  void sendStoredFile(response, { localDirectory: path.resolve(process.cwd(), "private-uploads", "reports"), storagePath: `reports/${fileName}`, fileName }).then((found) => {
+    if (!found && !response.headersSent) response.status(404).json({ error: "Report media not found" });
+  });
 });
 
 router.get("/officials/documents/:fileName", (request, response) => {
   const fileName = path.basename(request.params.fileName);
-  const filePath = path.resolve(process.cwd(), "private-uploads", "officials", fileName);
-  if (!fs.existsSync(filePath)) {
-    response.status(404).json({ error: "Document not found" });
-    return;
-  }
-  response.sendFile(filePath);
+  void sendStoredFile(response, { localDirectory: path.resolve(process.cwd(), "private-uploads", "officials"), storagePath: `officials/${fileName}`, fileName }).then((found) => {
+    if (!found && !response.headersSent) response.status(404).json({ error: "Document not found" });
+  });
 });
 
 router.get("/residents/documents/:fileName", (request, response) => {
   const fileName = path.basename(request.params.fileName);
-  const filePath = path.resolve(process.cwd(), "private-uploads", "residents", fileName);
-  if (!fs.existsSync(filePath)) {
-    response.status(404).json({ error: "Resident document not found" });
-    return;
-  }
-  response.sendFile(filePath);
+  void sendStoredFile(response, { localDirectory: path.resolve(process.cwd(), "private-uploads", "residents"), storagePath: `residents/${fileName}`, fileName }).then((found) => {
+    if (!found && !response.headersSent) response.status(404).json({ error: "Resident document not found" });
+  });
 });
 
 router.patch("/reports/:id/status", async (request, response, next) => {

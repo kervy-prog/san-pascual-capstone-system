@@ -8,6 +8,7 @@ import multer from "multer";
 import { z } from "zod";
 import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
+import { storeUpload } from "../../lib/file-storage.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 
 const router = Router();
@@ -96,10 +97,9 @@ router.post("/signup", upload.fields([
     const passwordHash = await bcrypt.hash(input.password, 12);
     let residencyIdPath: string | undefined;
     if (input.role === "RESIDENT" && residencyIdFile) {
-      await fs.mkdir(residentUploadDirectory, { recursive: true });
       const extension = path.extname(residencyIdFile.originalname).toLowerCase() || ".bin";
       const fileName = `${crypto.randomUUID()}${extension}`;
-      await fs.writeFile(path.join(residentUploadDirectory, fileName), residencyIdFile.buffer);
+      await storeUpload({ localDirectory: residentUploadDirectory, storagePath: `residents/${fileName}`, fileName, buffer: residencyIdFile.buffer, contentType: residencyIdFile.mimetype });
       residencyIdPath = `/uploads/residents/${fileName}`;
     }
     const user = await prisma.resident.create({
@@ -134,11 +134,10 @@ router.post("/signup", upload.fields([
         response.status(400).json({ error: "Official verification details are incomplete" });
         return;
       }
-      await fs.mkdir(uploadDirectory, { recursive: true });
       const saveUpload = async (file: Express.Multer.File) => {
         const extension = path.extname(file.originalname).toLowerCase() || ".bin";
         const fileName = `${user.id}-${crypto.randomUUID()}${extension}`;
-        await fs.writeFile(path.join(uploadDirectory, fileName), file.buffer);
+        await storeUpload({ localDirectory: uploadDirectory, storagePath: `officials/${fileName}`, fileName, buffer: file.buffer, contentType: file.mimetype });
         return `/uploads/officials/${fileName}`;
       };
       await prisma.barangayOfficial.create({

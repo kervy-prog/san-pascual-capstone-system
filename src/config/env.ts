@@ -10,6 +10,9 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().url().optional(),
   SEMAPHORE_API_KEY: z.string().min(1).optional(),
   SEMAPHORE_SENDER_NAME: z.string().min(1).max(11).default("SANPASCUAL"),
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  SUPABASE_STORAGE_BUCKET: z.string().min(1).default("private-uploads"),
 });
 
 export const env = envSchema.parse(process.env);

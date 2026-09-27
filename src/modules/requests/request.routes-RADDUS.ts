@@ -9,6 +9,7 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { isWithinSanPascualVicinity } from "./report-geofence.js";
 import { geocodeBarangayCenter, geocodeReportedLandmark } from "../../lib/geocoder.js";
+import { storeUpload } from "../../lib/file-storage.js";
 
 const router = Router();
 const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
@@ -131,12 +132,11 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     });
 
     if (files.length > 0) {
-      await fs.mkdir(reportUploadDirectory, { recursive: true });
       await prisma.reportMedia.createMany({
         data: await Promise.all(files.map(async (file) => {
           const extension = path.extname(file.originalname).toLowerCase() || ".bin";
           const fileName = `${created.id}-${crypto.randomUUID()}${extension}`;
-          await fs.writeFile(path.join(reportUploadDirectory, fileName), file.buffer);
+          await storeUpload({ localDirectory: reportUploadDirectory, storagePath: `reports/${fileName}`, fileName, buffer: file.buffer, contentType: file.mimetype });
           return {
             reportId: created.id,
             filePath: `/private-uploads/reports/${fileName}`,

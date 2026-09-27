@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { sendResidentProgressSms } from "../../lib/semaphore.js";
+import { sendStoredFile } from "../../lib/file-storage.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -81,12 +82,9 @@ router.get("/overview", async (request: AuthRequest, response, next) => {
 
 router.get("/reports/media/:fileName", (request, response) => {
   const fileName = path.basename(request.params.fileName);
-  const filePath = path.resolve(process.cwd(), "private-uploads", "reports", fileName);
-  if (!fs.existsSync(filePath)) {
-    response.status(404).json({ error: "Report media not found" });
-    return;
-  }
-  response.sendFile(filePath);
+  void sendStoredFile(response, { localDirectory: path.resolve(process.cwd(), "private-uploads", "reports"), storagePath: `reports/${fileName}`, fileName }).then((found) => {
+    if (!found && !response.headersSent) response.status(404).json({ error: "Report media not found" });
+  });
 });
 
 router.patch("/reports/:id/status", async (request: AuthRequest, response, next) => {
