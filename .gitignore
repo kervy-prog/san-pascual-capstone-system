@@ -7,3 +7,4 @@ dist/
 private-uploads/
 prisma/dev.db
 prisma/dev.db-journal
+.vercel

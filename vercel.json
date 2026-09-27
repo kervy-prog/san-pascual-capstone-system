@@ -2,7 +2,15 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "public",
   "installCommand": "npm install",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/health/db", "destination": "/api" }
+  ],
   "functions": {
+    "api/index.ts": {
+      "maxDuration": 60
+    },
     "api/[...path].ts": {
       "maxDuration": 60
     }

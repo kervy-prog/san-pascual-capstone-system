@@ -57,6 +57,8 @@ async function run() {
   residentForm.append('residencyConfirmed', 'true');
   residentForm.append('privacyConsent', 'true');
   residentForm.append('role', 'RESIDENT');
+  const dummyResidencyId = Buffer.from('fake residency ID content');
+  residentForm.append('residencyIdFile', new Blob([dummyResidencyId], { type: 'image/jpeg' }), 'residency_id.jpg');
 
   const resSignupRes = await fetch(`${BASE_URL}/api/auth/signup`, {
     method: 'POST',

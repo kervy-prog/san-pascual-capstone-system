@@ -1,0 +1,4 @@
+ALTER TABLE "InfrastructureReport"
+  ADD COLUMN IF NOT EXISTS "locationLatitude" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "locationLongitude" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "locationSource" TEXT;

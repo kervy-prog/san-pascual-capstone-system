@@ -29,6 +29,7 @@ export async function storeUpload(options: {
         "Content-Type": options.contentType,
         "x-upsert": "false",
       },
+      signal: AbortSignal.timeout(8000),
       body: new Uint8Array(options.buffer),
     });
     if (!response.ok) throw new Error(`Supabase Storage upload failed (${response.status})`);
@@ -51,6 +52,7 @@ export async function sendStoredFile(response: Response, options: {
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
         apikey: env.SUPABASE_SERVICE_ROLE_KEY!,
       },
+      signal: AbortSignal.timeout(8000),
     });
     if (!fileResponse.ok) return false;
     response.type(fileResponse.headers.get("content-type") || "application/octet-stream");

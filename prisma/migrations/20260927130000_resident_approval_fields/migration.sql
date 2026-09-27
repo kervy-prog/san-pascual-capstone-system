@@ -1,0 +1,11 @@
+DO $$
+BEGIN
+  CREATE TYPE "ApprovalStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "Resident"
+  ADD COLUMN IF NOT EXISTS "approvalStatus" "ApprovalStatus" NOT NULL DEFAULT 'PENDING',
+  ADD COLUMN IF NOT EXISTS "privacyConsent" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "privacyConsentAt" TIMESTAMP(3);

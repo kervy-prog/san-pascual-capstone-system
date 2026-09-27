@@ -138,6 +138,7 @@ form.addEventListener('submit', async (event) => {
   }
 
   const payload = { email, password: passwordValue };
+  let residencyIdFile;
   if (state.mode === 'signup') {
     updateAgeFromBirthDate();
     if (!/[a-z]/.test(passwordValue) || !/[A-Z]/.test(passwordValue) || !/[0-9]/.test(passwordValue) || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(passwordValue)) {
@@ -164,7 +165,7 @@ form.addEventListener('submit', async (event) => {
     payload.privacyConsent = document.querySelector('#privacy-consent').checked;
     payload.role = state.role;
     payload.confirmPassword = confirmPassword.value;
-    const residencyIdFile = document.querySelector('#residency-id-file').files[0];
+    residencyIdFile = document.querySelector('#residency-id-file').files[0];
     if (!payload.firstName || !payload.lastName || !payload.middleName || !payload.age || !payload.gender || !payload.birthDate || !payload.nationality || !payload.phone || !payload.address || !payload.residencyConfirmed || !payload.privacyConsent || (state.role === 'RESIDENT' && !residencyIdFile)) {
       setMessage('Complete all required information, upload proof of residency, and provide the required confirmations.');
       return;
@@ -195,7 +196,13 @@ form.addEventListener('submit', async (event) => {
       }
     }
     const response = await fetch(`${API_BASE_URL}/api/auth/${state.mode}`, { method: 'POST', ...(state.mode === 'login' ? { headers: { 'Content-Type': 'application/json' } } : {}), body: requestBody });
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      throw new Error(`Server error (${response.status}). Please try again later.`);
+    }
     if (!response.ok) throw new Error(data.error || 'Unable to complete this request.');
     localStorage.removeItem('sanPascualToken');
     localStorage.removeItem('sanPascualUser');
