@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "frontend": "node scripts/serve-frontend.mjs",
-    "vercel-build": "npx prisma generate && node scripts/prepare-frontend.mjs",
+    "vercel-build": "npx prisma generate && npx prisma migrate deploy && node scripts/prepare-frontend.mjs",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
