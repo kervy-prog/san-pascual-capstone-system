@@ -77,13 +77,15 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     }
     const files = (request.files as Express.Multer.File[] | undefined) || [];
     const imageFiles = files.filter((file) => file.mimetype.startsWith("image/"));
+    const geofenceSetting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
+    const enforceReportGeofence = geofenceSetting?.value ?? true;
     let photoLocation: { latitude: number; longitude: number } | undefined;
 
     for (const file of imageFiles) {
       const metadata = await gps(file.buffer).catch(() => undefined);
       if (metadata && typeof metadata.latitude === "number" && typeof metadata.longitude === "number") {
         photoLocation = metadata;
-        if (!isWithinSanPascualVicinity(metadata.latitude, metadata.longitude)) {
+        if (enforceReportGeofence && !isWithinSanPascualVicinity(metadata.latitude, metadata.longitude)) {
           response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
           return;
         }
@@ -110,7 +112,7 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
       response.status(422).json({ error: "A location pin is required for image reports. Allow device location or enable camera GPS metadata." });
       return;
     }
-    if (submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
+    if (enforceReportGeofence && submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
       response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
       return;
     }

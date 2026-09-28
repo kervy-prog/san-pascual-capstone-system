@@ -8,6 +8,8 @@ const reportMediaImage = document.querySelector('#report-media-image');
 const reportMediaLocation = document.querySelector('#report-media-location');
 const reportMediaMap = document.querySelector('#report-media-map');
 let approvedOfficials = [];
+const reportGeofenceToggle = document.querySelector('#report-geofence-toggle');
+const geofenceStatus = document.querySelector('#geofence-status');
 
 function closeReportMedia() {
   const imageUrl = reportMediaImage.src;
@@ -87,6 +89,38 @@ async function updateOfficialStatus(id, status) {
     message.classList.add('error');
   }
 }
+
+function renderGeofenceSetting(enforceReportGeofence) {
+  reportGeofenceToggle.checked = enforceReportGeofence;
+  geofenceStatus.textContent = enforceReportGeofence ? 'ON · Barangay range required' : 'OFF · Any location allowed';
+}
+
+async function loadGeofenceSetting() {
+  try {
+    const setting = await request('/settings/report-geofence');
+    renderGeofenceSetting(setting.enforceReportGeofence);
+  } catch (error) {
+    geofenceStatus.textContent = 'Unable to load setting';
+    message.textContent = error.message;
+    message.classList.add('error');
+  }
+}
+
+reportGeofenceToggle.addEventListener('change', async () => {
+  reportGeofenceToggle.disabled = true;
+  try {
+    const setting = await request('/settings/report-geofence', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enforceReportGeofence: reportGeofenceToggle.checked }) });
+    renderGeofenceSetting(setting.enforceReportGeofence);
+    message.textContent = setting.enforceReportGeofence ? 'Barangay location range enforcement enabled.' : 'Location range enforcement disabled. Report locations will still be tagged.';
+    message.classList.remove('error');
+  } catch (error) {
+    reportGeofenceToggle.checked = !reportGeofenceToggle.checked;
+    message.textContent = error.message;
+    message.classList.add('error');
+  } finally {
+    reportGeofenceToggle.disabled = false;
+  }
+});
 
 function accountCard(account) {
   const official = account.officialProfile;
@@ -262,6 +296,7 @@ async function loadReportApprovals() {
 
 async function loadDashboard() {
   try {
+    await loadGeofenceSetting();
     const overview = await request('/overview');
     const residentCount = document.querySelector('#resident-count');
     const officialCount = document.querySelector('#official-count');

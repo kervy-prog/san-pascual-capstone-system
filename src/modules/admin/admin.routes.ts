@@ -13,6 +13,30 @@ const approvalSchema = z.object({ status: z.enum(["APPROVED", "REJECTED"]) });
 const officialStatusSchema = z.object({ status: z.enum(["ACTIVE", "RETIRED", "NOT_ON_DUTY"]) });
 const reportApprovalSchema = z.object({ status: z.enum(["SUBMITTED", "UNDER_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED", "CANCELLED"]) });
 const reportAssignmentSchema = z.object({ officialId: z.string().cuid().nullable() });
+const reportGeofenceSchema = z.object({ enforceReportGeofence: z.boolean() });
+
+router.get("/settings/report-geofence", async (_request, response, next) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
+    response.json({ enforceReportGeofence: setting?.value ?? true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/settings/report-geofence", async (request, response, next) => {
+  try {
+    const { enforceReportGeofence } = reportGeofenceSchema.parse(request.body);
+    const setting = await prisma.appSetting.upsert({
+      where: { key: "enforceReportGeofence" },
+      create: { key: "enforceReportGeofence", value: enforceReportGeofence },
+      update: { value: enforceReportGeofence },
+    });
+    response.json({ enforceReportGeofence: setting.value });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/overview", async (_request, response, next) => {
   try {

@@ -194,3 +194,9 @@ model BarangayAction {
   report       InfrastructureReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   official     BarangayOfficial     @relation(fields: [officialId], references: [id])
 }
+
+model AppSetting {
+  key       String   @id
+  value     Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
