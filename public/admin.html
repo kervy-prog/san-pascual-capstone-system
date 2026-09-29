@@ -44,6 +44,14 @@
       <iframe id="report-media-map" class="report-media-map hidden" title="Image location map" loading="lazy"></iframe>
     </div>
   </div>
+  <div class="media-modal hidden" id="verification-document-modal" role="dialog" aria-modal="true" aria-labelledby="verification-document-title">
+    <div class="media-modal-card verification-document-card">
+      <div class="section-heading"><h2 id="verification-document-title">Verification document</h2><button type="button" class="media-modal-close" id="close-verification-document">Close</button></div>
+      <p id="verification-document-error" class="verification-document-error" role="alert"></p>
+      <img id="verification-document-image" class="hidden" alt="Uploaded verification document" />
+      <iframe id="verification-document-pdf" class="verification-document-pdf hidden" title="Uploaded verification PDF"></iframe>
+    </div>
+  </div>
   <script src="/config.js"></script>
   <script src="/admin.js" defer></script>
 </body>

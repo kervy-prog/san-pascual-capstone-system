@@ -7,6 +7,12 @@ const reportMediaModal = document.querySelector('#report-media-modal');
 const reportMediaImage = document.querySelector('#report-media-image');
 const reportMediaLocation = document.querySelector('#report-media-location');
 const reportMediaMap = document.querySelector('#report-media-map');
+const verificationDocumentModal = document.querySelector('#verification-document-modal');
+const verificationDocumentTitle = document.querySelector('#verification-document-title');
+const verificationDocumentImage = document.querySelector('#verification-document-image');
+const verificationDocumentPdf = document.querySelector('#verification-document-pdf');
+const verificationDocumentError = document.querySelector('#verification-document-error');
+let verificationDocumentUrl = '';
 let approvedOfficials = [];
 const reportGeofenceToggle = document.querySelector('#report-geofence-toggle');
 const geofenceStatus = document.querySelector('#geofence-status');
@@ -22,6 +28,49 @@ function closeReportMedia() {
 }
 
 document.querySelector('#close-report-media').addEventListener('click', closeReportMedia);
+
+function closeVerificationDocument() {
+  verificationDocumentModal.classList.add('hidden');
+  verificationDocumentImage.classList.add('hidden');
+  verificationDocumentPdf.classList.add('hidden');
+  verificationDocumentImage.removeAttribute('src');
+  verificationDocumentPdf.removeAttribute('src');
+  verificationDocumentError.textContent = '';
+  if (verificationDocumentUrl) URL.revokeObjectURL(verificationDocumentUrl);
+  verificationDocumentUrl = '';
+}
+
+document.querySelector('#close-verification-document').addEventListener('click', closeVerificationDocument);
+
+async function viewVerificationDocument(url, title) {
+  closeVerificationDocument();
+  verificationDocumentTitle.textContent = title;
+  verificationDocumentModal.classList.remove('hidden');
+  try {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error('Unable to load this document. Check that the file is available.');
+    const documentBlob = await response.blob();
+    verificationDocumentUrl = URL.createObjectURL(documentBlob);
+    if (documentBlob.type === 'application/pdf') {
+      verificationDocumentPdf.src = verificationDocumentUrl;
+      verificationDocumentPdf.classList.remove('hidden');
+    } else if (documentBlob.type.startsWith('image/')) {
+      verificationDocumentImage.src = verificationDocumentUrl;
+      verificationDocumentImage.classList.remove('hidden');
+    } else {
+      throw new Error('This document format cannot be previewed.');
+    }
+  } catch (error) {
+    verificationDocumentError.textContent = error.message;
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('.document-link');
+  if (!link) return;
+  event.preventDefault();
+  viewVerificationDocument(link.dataset.documentUrl, link.dataset.documentTitle);
+});
 
 if (!token || !storedUser || storedUser.role !== 'ADMIN') {
   window.location.replace('/');
@@ -132,13 +181,13 @@ function accountCard(account) {
     const proofPath = official.proofOfAppointment || '';
     const idFile = idPath ? idPath.split('/').pop() : '';
     const proofFile = proofPath ? proofPath.split('/').pop() : '';
-    const idLink = idFile ? `<a href="${API_BASE_URL}/api/admin/officials/documents/${encodeURIComponent(idFile)}" target="_blank" class="document-link">View ID (${idLabel})</a>` : '';
-    const proofLink = proofFile ? `<a href="${API_BASE_URL}/api/admin/officials/documents/${encodeURIComponent(proofFile)}" target="_blank" class="document-link">View Appointment Proof</a>` : '';
+    const idLink = idFile ? `<a href="#" data-document-url="${API_BASE_URL}/api/admin/officials/documents/${encodeURIComponent(idFile)}" data-document-title="Government ID (${idLabel})" class="document-link">View ID (${idLabel})</a>` : '';
+    const proofLink = proofFile ? `<a href="#" data-document-url="${API_BASE_URL}/api/admin/officials/documents/${encodeURIComponent(proofFile)}" data-document-title="Appointment Proof" class="document-link">View Appointment Proof</a>` : '';
     const docs = [idLink, proofLink].filter(Boolean).join(' · ');
     extra = `<p><strong>${official.designationPosition}</strong> · ${idLabel}</p><p class="documents">Documents: ${docs || 'None received'}</p>`;
   }
   const residencyIdFile = account.residencyIdFile ? account.residencyIdFile.split('/').pop() : '';
-  const residencyIdLink = residencyIdFile ? `<p class="documents">Proof of residency: <a href="${API_BASE_URL}/api/admin/residents/documents/${encodeURIComponent(residencyIdFile)}" target="_blank" class="document-link">View submitted ID</a></p>` : '<p class="documents">Proof of residency: None received</p>';
+  const residencyIdLink = residencyIdFile ? `<p class="documents">Proof of residency: <a href="#" data-document-url="${API_BASE_URL}/api/admin/residents/documents/${encodeURIComponent(residencyIdFile)}" data-document-title="Resident Proof of Residency" class="document-link">View submitted ID</a></p>` : '<p class="documents">Proof of residency: None received</p>';
   return `<article class="approval-card"><div class="account-avatar">${account.firstName[0]}${account.lastName[0]}</div><div class="account-details"><div class="account-title"><h3>${account.firstName} ${account.middleName} ${account.lastName}</h3><span class="pending-badge">Pending</span></div><p>${account.email} · ${account.phone}</p><p>${account.address}, ${account.barangay}, ${account.municipality}, ${account.province}</p>${residencyIdLink}${extra}<small>Submitted ${new Date(account.createdAt).toLocaleDateString('en-PH')}</small></div><div class="approval-actions"><button class="approve-button" data-id="${account.id}" data-status="APPROVED">Approve</button><button class="reject-button" data-id="${account.id}" data-status="REJECTED">Reject</button></div></article>`;
 }
 
