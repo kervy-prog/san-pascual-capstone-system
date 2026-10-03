@@ -193,6 +193,7 @@ async function run() {
   console.log("\n[Test 5] Infrastructure Report Lifecycle");
   const reportForm = new FormData();
   reportForm.append('categoryId', 'residential-issues');
+  reportForm.append('urgencyLevel', 'CRITICAL');
   reportForm.append('exactLocationLandmark', 'Purok 3 near Main Irrigation Canal');
   reportForm.append('descriptionOfHazard', 'Clogged drainage culvert overflowing onto roadway');
   reportForm.append('currentStatus', 'SUBMITTED');
@@ -226,6 +227,7 @@ async function run() {
   const createdReport = adminReports.find((r) => r.id === reportId);
   await assert(Boolean(createdReport), "Report visible in admin reports database");
   await assert(createdReport.category.name === 'Residential Issues', "Residential Issues category resolves to its database category");
+  await assert(createdReport.urgencyLevel === 'CRITICAL', "Resident-selected urgency is saved on the report");
   await assert(createdReport.media.length === 1, "Report media correctly linked");
 
   const assignReportRes = await fetch(`${BASE_URL}/api/admin/reports/${reportId}/assignment`, {

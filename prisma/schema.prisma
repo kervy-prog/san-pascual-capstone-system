@@ -142,6 +142,7 @@ model InfrastructureReport {
   dateSubmitted         DateTime               @default(now())
   ticketNumber          String                 @unique
   status                ReportStatus           @default(SUBMITTED)
+  urgencyLevel          String                 @default("MEDIUM")
   resolvedAt            DateTime?
   resolutionDetails     String?
   locationLatitude      Float?

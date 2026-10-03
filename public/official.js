@@ -89,7 +89,8 @@ function escapeHtml(value) {
 function reportRow(report) {
   const resident = report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`;
   const reportIdSub = report.reportId && report.reportId !== report.ticketNumber ? `<small>${report.reportId}</small>` : '';
-  return `<tr><td><strong>${report.ticketNumber}</strong>${reportIdSub}</td><td>${resident}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td><span class="urgency urgency-${report.category.urgencyLevel.toLowerCase()}">${report.category.urgencyLevel}</span></td><td><span class="status-pill">${(report.currentStatus || report.status).replaceAll('_', ' ')}</span></td><td>${formatDate(report.dateSubmitted, true)}</td></tr>`;
+  const urgencyLevel = report.urgencyLevel || report.category.urgencyLevel;
+  return `<tr><td><strong>${report.ticketNumber}</strong>${reportIdSub}</td><td>${resident}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td><span class="urgency urgency-${urgencyLevel.toLowerCase()}">${urgencyLevel}</span></td><td><span class="status-pill">${(report.currentStatus || report.status).replaceAll('_', ' ')}</span></td><td>${formatDate(report.dateSubmitted, true)}</td></tr>`;
 }
 
 function hazardCard(report) {
@@ -130,7 +131,8 @@ function hazardCard(report) {
     ? `<form class="resolution-form" data-resolution-report-id="${report.id}"><label for="resolution-details-${report.id}">Resolution results <span>(optional)</span></label><textarea id="resolution-details-${report.id}" name="resolutionDetails" rows="3" maxlength="2000" placeholder="Describe the work completed and its result."></textarea><label for="resolution-proof-${report.id}">Photo proof <span>(optional, JPG, PNG, or WebP; up to 5 MB)</span></label><input id="resolution-proof-${report.id}" name="resolutionProof" type="file" accept="image/jpeg,image/png,image/webp" /><button type="submit" class="resolution-button">Mark as resolved</button></form>`
     : '';
 
-  return `<article class="hazard-card"><div class="hazard-card-head"><div><p class="eyebrow">${report.category.urgencyLevel} PRIORITY</p><h3>${report.category.name}</h3></div><span class="status-pill">${currentStatus.replaceAll('_', ' ')}</span></div><div class="hazard-grid"><div><label>Ticket</label><p>${report.ticketNumber}</p></div><div><label>Reported by</label><p>${resident}</p></div><div><label>Exact location</label><p>${report.exactLocationLandmark}</p></div><div><label>Date submitted</label><p>${formatDate(report.dateSubmitted, true)}</p></div></div><div class="hazard-description"><label>Description</label><p>${report.descriptionOfHazard}</p><small>${mediaHtml}</small></div>${feedbackHtml}${feedbackForm}${resolutionForm}${residentCommentsHtml}${residentCommentForm}<div class="hazard-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">${actionButtons}</div></article>`;
+  const urgencyLevel = report.urgencyLevel || report.category.urgencyLevel;
+  return `<article class="hazard-card"><div class="hazard-card-head"><div><p class="eyebrow">${urgencyLevel} PRIORITY</p><h3>${report.category.name}</h3></div><span class="status-pill">${currentStatus.replaceAll('_', ' ')}</span></div><div class="hazard-grid"><div><label>Ticket</label><p>${report.ticketNumber}</p></div><div><label>Reported by</label><p>${resident}</p></div><div><label>Exact location</label><p>${report.exactLocationLandmark}</p></div><div><label>Date submitted</label><p>${formatDate(report.dateSubmitted, true)}</p></div></div><div class="hazard-description"><label>Description</label><p>${report.descriptionOfHazard}</p><small>${mediaHtml}</small></div>${feedbackHtml}${feedbackForm}${resolutionForm}${residentCommentsHtml}${residentCommentForm}<div class="hazard-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">${actionButtons}</div></article>`;
 }
 
 async function updateReportStatus(reportId, newStatus) {

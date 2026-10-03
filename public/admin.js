@@ -318,6 +318,18 @@ function statusControl(report) {
   return `<span class="status-pill">${(report.currentStatus || report.status).replace('_', ' ')}</span><select class="report-status" data-report-id="${report.id}">${statuses.map((status) => `<option value="${status}" ${status === report.status ? 'selected' : ''}>${status.replace('_', ' ')}</option>`).join('')}</select>`;
 }
 
+const urgencyPriority = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+function reportUrgencyLevel(report) {
+  const level = report.urgencyLevel || report.category?.urgencyLevel;
+  return Object.hasOwn(urgencyPriority, level) ? level : 'MEDIUM';
+}
+
+function compareReportUrgency(left, right) {
+  return urgencyPriority[reportUrgencyLevel(left)] - urgencyPriority[reportUrgencyLevel(right)]
+    || new Date(right.dateSubmitted).getTime() - new Date(left.dateSubmitted).getTime();
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
@@ -346,7 +358,9 @@ async function loadReports() {
   try {
     const allReports = await request('/reports');
     renderResolvedReports(allReports);
-    const reports = allReports.filter((report) => report.status !== 'SUBMITTED' && report.status !== 'RESOLVED');
+    const reports = allReports
+      .filter((report) => report.status !== 'SUBMITTED' && report.status !== 'RESOLVED')
+      .sort(compareReportUrgency);
     document.querySelector('#report-list').innerHTML = reports.length
       ? reports.map((report) => {
         const image = report.media?.find((item) => item.mediaType === 'IMAGE');
@@ -356,7 +370,7 @@ async function loadReports() {
           const officialName = action.official?.resident ? `${action.official.resident.firstName} ${action.official.resident.lastName}` : 'Barangay official';
           return `<div class="field-feedback-note"><strong>${escapeHtml(officialName)} · On-site feedback</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
         }).join('');
-        return `<tr><td><strong>${report.reportId || report.ticketNumber}</strong></td><td>${report.ticketNumber}</td><td>${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td>${report.category.urgencyLevel}</td><td>${report.exactLocationLandmark}</td><td>${report.descriptionOfHazard}${feedbackHtml}</td><td>${assignmentControl(report)}</td><td>${statusControl(report)}</td><td>${mediaAction}</td><td>${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
+        return `<tr><td><strong>${report.reportId || report.ticketNumber}</strong></td><td>${report.ticketNumber}</td><td>${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td>${reportUrgencyLevel(report)}</td><td>${report.exactLocationLandmark}</td><td>${report.descriptionOfHazard}${feedbackHtml}</td><td>${assignmentControl(report)}</td><td>${statusControl(report)}</td><td>${mediaAction}</td><td>${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
       }).join('')
       : '<tr><td colspan="11" class="empty-state">No reports submitted yet.</td></tr>';
     document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath, button.dataset)));
@@ -401,13 +415,13 @@ function reportApprovalCard(report) {
   const image = report.media?.find((item) => item.mediaType === 'IMAGE');
   const mediaAction = image ? reportMediaButton(image, report) : '';
   const locationAction = reportLocationMarkup(report, true);
-  return `<article class="approval-card report-approval-card"><div class="account-avatar">!</div><div class="account-details"><div class="account-title"><h3>${report.ticketNumber}</h3><span class="pending-badge">Needs review</span></div><p>${residentName} · ${report.category.name} · ${report.category.urgencyLevel}</p><p>${report.exactLocationLandmark}</p><p>${locationAction}</p><p>${report.descriptionOfHazard}</p><p><strong>Assign official</strong> ${assignmentControl(report)}</p><small>Submitted ${new Date(report.dateSubmitted).toLocaleString('en-PH')}</small></div><div class="approval-actions">${mediaAction}<button class="approve-button" data-report-status="UNDER_REVIEW" data-report-id="${report.id}">Approve</button><button class="reject-button" data-report-status="REJECTED" data-report-id="${report.id}">Reject</button></div></article>`;
+  return `<article class="approval-card report-approval-card"><div class="account-avatar">!</div><div class="account-details"><div class="account-title"><h3>${report.ticketNumber}</h3><span class="pending-badge">Needs review</span></div><p>${residentName} · ${report.category.name} · ${reportUrgencyLevel(report)}</p><p>${report.exactLocationLandmark}</p><p>${locationAction}</p><p>${report.descriptionOfHazard}</p><p><strong>Assign official</strong> ${assignmentControl(report)}</p><small>Submitted ${new Date(report.dateSubmitted).toLocaleString('en-PH')}</small></div><div class="approval-actions">${mediaAction}<button class="approve-button" data-report-status="UNDER_REVIEW" data-report-id="${report.id}">Approve</button><button class="reject-button" data-report-status="REJECTED" data-report-id="${report.id}">Reject</button></div></article>`;
 }
 
 async function loadReportApprovals() {
   try {
     const reports = await request('/reports');
-    const pendingReports = reports.filter((report) => report.status === 'SUBMITTED');
+    const pendingReports = reports.filter((report) => report.status === 'SUBMITTED').sort(compareReportUrgency);
     document.querySelector('#nav-report-pending').textContent = pendingReports.length;
     document.querySelector('#report-approval-count').textContent = pendingReports.length;
     document.querySelector('#report-approval-list').innerHTML = pendingReports.length

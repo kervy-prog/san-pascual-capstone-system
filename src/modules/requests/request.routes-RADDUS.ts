@@ -30,6 +30,7 @@ const categoryNames: Record<string, string> = {
 
 const createRequestSchema = z.object({
   categoryId: z.string().trim().min(1),
+  urgencyLevel: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
   exactLocationLandmark: z.string().trim().min(5).max(500),
   descriptionOfHazard: z.string().trim().min(10).max(5000),
   currentStatus: z.string().trim().min(2).max(50),
@@ -110,6 +111,9 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
       response.status(400).json({ error: "Select a valid infrastructure report category." });
       return;
     }
+    const allowedUrgencyLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+    const urgencyLevel = input.urgencyLevel
+      ?? (allowedUrgencyLevels.includes(category.urgencyLevel) ? category.urgencyLevel : "MEDIUM");
     const files = (request.files as Express.Multer.File[] | undefined) || [];
     const imageFiles = files.filter((file) => file.mimetype.startsWith("image/"));
     const geofenceSetting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
@@ -155,6 +159,7 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     const created = await prisma.infrastructureReport.create({
       data: {
         categoryId: category.id,
+        urgencyLevel,
         exactLocationLandmark: input.exactLocationLandmark,
         descriptionOfHazard: input.descriptionOfHazard,
         currentStatus: input.currentStatus,

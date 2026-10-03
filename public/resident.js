@@ -177,6 +177,7 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
   const descriptionOfHazard = document.querySelector('#report-description').value.trim();
   const payload = new FormData();
   payload.append('categoryId', categoryId);
+  payload.append('urgencyLevel', urgencyLevel);
   payload.append('exactLocationLandmark', exactLocationLandmark);
   payload.append('descriptionOfHazard', descriptionOfHazard);
   payload.append('currentStatus', 'SUBMITTED');
