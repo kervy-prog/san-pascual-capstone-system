@@ -285,17 +285,48 @@ async function run() {
   await assert(reportWithFeedback.actions.some((action) => action.actionStatus === 'FIELD_FEEDBACK' && action.actionRemarks === fieldFeedback.actionRemarks), "Saved field feedback is visible through admin report records");
 
   // Official updates status to RESOLVED
+  const resolutionForm = new FormData();
+  resolutionForm.append('status', 'RESOLVED');
+  resolutionForm.append('resolutionDetails', 'Culvert cleared and water flow restored.');
+  resolutionForm.append('resolutionProof', new Blob([reportImage], { type: 'image/jpeg' }), 'resolution-proof.jpg');
   const offResolvedRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${officialToken}` },
-    body: JSON.stringify({ status: 'RESOLVED', notes: 'Culvert cleared and water flow restored' }),
+    headers: { Authorization: `Bearer ${officialToken}` },
+    body: resolutionForm,
   });
-  await assert(offResolvedRes.status === 200, "Official marks report as RESOLVED");
+  const resolvedReport = await offResolvedRes.json();
+  await assert(offResolvedRes.status === 200 && resolvedReport.resolvedAt, "Official marks report as RESOLVED and the timestamp is recorded");
+  await assert(resolvedReport.resolutionDetails === 'Culvert cleared and water flow restored.', "Official's resolution results are saved");
+  const residentReportWithResolution = await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${residentToken}` } })).json();
+  const resolvedResidentReport = residentReportWithResolution.user.reports.find((report) => report.id === reportId);
+  await assert(resolvedResidentReport.resolvedAt && resolvedResidentReport.resolutionDetails === resolvedReport.resolutionDetails, "Resident can see the resolution date and results");
+  const proofMedia = resolvedResidentReport.media.find((item) => item.isResolutionProof);
+  await assert(Boolean(proofMedia), "Optional resolution proof image is stored separately from resident attachments");
+  const resolutionProofRes = await fetch(`${BASE_URL}/api/requests/${reportId}/resolution-proof`, {
+    headers: { Authorization: `Bearer ${residentToken}` },
+  });
+  const resolutionProof = await resolutionProofRes.arrayBuffer();
+  await assert(resolutionProofRes.status === 200 && resolutionProof.byteLength > 0, "Resident can view proof image for their own resolved report");
+  const officialProofRes = await fetch(`${BASE_URL}/api/requests/${reportId}/resolution-proof`, {
+    headers: { Authorization: `Bearer ${officialToken}` },
+  });
+  await assert(officialProofRes.status === 403, "Other roles cannot use the resident-only proof endpoint");
   const resolvedMediaRes = await fetch(`${BASE_URL}/api/admin/reports/media/${encodeURIComponent(mediaFileName)}`, {
     headers: { Authorization: `Bearer ${adminToken}` },
   });
   const mediaSizeAfterResolution = (await resolvedMediaRes.arrayBuffer()).byteLength;
   await assert(resolvedMediaRes.status === 200 && mediaSizeAfterResolution < mediaSizeBeforeResolution, "Report image is smaller after resolution");
+
+  const residentCommentRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/resident-comment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${officialToken}` },
+    body: JSON.stringify({ comment: 'We cannot finish this for now because of heavy rainfall.' }),
+  });
+  const residentComment = await residentCommentRes.json();
+  await assert(residentCommentRes.status === 201, "Official adds a comment for the resident after resolution");
+  const residentReportAfterComment = await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${residentToken}` } })).json();
+  const residentVisibleComment = residentReportAfterComment.user.reports.find((report) => report.id === reportId)?.actions?.[0];
+  await assert(residentVisibleComment?.actionRemarks === residentComment.actionRemarks, "Resident can see the official's final report comment");
 
   // Verify Admin dashboard progress metrics
   const adminFinalOverview = await (await fetch(`${BASE_URL}/api/admin/overview`, { headers: { Authorization: `Bearer ${adminToken}` } })).json();

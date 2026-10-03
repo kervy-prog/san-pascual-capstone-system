@@ -14,6 +14,10 @@ const reportModalKicker = document.querySelector('#report-modal-kicker');
 const reportModalIcon = document.querySelector('#report-modal-icon');
 const closeReportModalLabel = document.querySelector('#close-report-modal-label');
 let selectedMediaFiles = [];
+const resolutionProofModal = document.querySelector('#resolution-proof-modal');
+const resolutionProofImage = document.querySelector('#resolution-proof-image');
+const resolutionProofError = document.querySelector('#resolution-proof-error');
+let resolutionProofUrl = '';
 
 function showReportModal({ error = false, message: modalMessage }) {
   reportSuccessModal.classList.toggle('error', error);
@@ -29,6 +33,38 @@ function showReportMessage(text, isError = false) {
   message.textContent = text;
   message.classList.toggle('error', isError);
   message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
+function closeResolutionProof() {
+  resolutionProofModal.classList.add('hidden');
+  resolutionProofImage.removeAttribute('src');
+  resolutionProofError.textContent = '';
+  if (resolutionProofUrl) URL.revokeObjectURL(resolutionProofUrl);
+  resolutionProofUrl = '';
+}
+
+document.querySelector('#close-resolution-proof').addEventListener('click', closeResolutionProof);
+
+async function viewResolutionProof(reportId) {
+  closeResolutionProof();
+  resolutionProofModal.classList.remove('hidden');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/requests/${encodeURIComponent(reportId)}/resolution-proof`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Unable to load resolution proof.');
+    }
+    resolutionProofUrl = URL.createObjectURL(await response.blob());
+    resolutionProofImage.src = resolutionProofUrl;
+  } catch (error) {
+    resolutionProofError.textContent = error.message;
+  }
 }
 
 function renderMediaPreview() {
@@ -228,16 +264,26 @@ async function fetchResidentProfile() {
     document.querySelector('#barangay-name').textContent = resident.barangay || 'San Pascual';
     document.querySelector('#report-count').textContent = resident.reports?.length || 0;
 
-    const rows = resident.reports?.length ? resident.reports.map((report) => `
+    const rows = resident.reports?.length ? resident.reports.map((report) => {
+      const residentComments = (report.actions || []).map((action) => `<div class="resident-status-comment"><strong>Barangay update</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`).join('');
+      const resolutionDate = report.resolvedAt ? `<small class="resolved-date">Resolved ${new Date(report.resolvedAt).toLocaleString('en-PH')}</small>` : '';
+      const resolutionDetails = report.resolutionDetails ? `<div class="resident-resolution-result"><strong>Resolution results</strong><p>${escapeHtml(report.resolutionDetails)}</p></div>` : '';
+      const hasResolutionProof = report.media?.some((item) => item.isResolutionProof);
+      const resolutionProof = hasResolutionProof ? `<button type="button" class="resolution-proof-button" data-resolution-report-id="${report.id}">View photo proof</button>` : '';
+      return `
       <tr>
         <td>${report.ticketNumber || report.id}</td>
         <td>${report.category?.name || 'N/A'}</td>
         <td>${report.exactLocationLandmark || 'N/A'}</td>
-        <td>${report.status || report.currentStatus || 'SUBMITTED'}</td>
+        <td><strong>${report.status || report.currentStatus || 'SUBMITTED'}</strong>${resolutionDate}${resolutionDetails}${resolutionProof}${residentComments}</td>
         <td>${new Date(report.dateSubmitted || report.createdAt).toLocaleDateString('en-PH')}</td>
       </tr>
-    `).join('') : '<tr><td colspan="5" class="empty-state">No reports submitted yet.</td></tr>';
+    `;
+    }).join('') : '<tr><td colspan="5" class="empty-state">No reports submitted yet.</td></tr>';
     document.querySelector('#resident-report-list').innerHTML = rows;
+    document.querySelectorAll('.resolution-proof-button').forEach((button) => {
+      button.addEventListener('click', () => viewResolutionProof(button.dataset.resolutionReportId));
+    });
   } catch (error) {
     message.textContent = error.message;
     message.classList.add('error');

@@ -1,14 +1,22 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
+import multer from "multer";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { sendResidentProgressSms } from "../../lib/semaphore.js";
 import { sendStoredFile } from "../../lib/file-storage.js";
+import { storeUpload } from "../../lib/file-storage.js";
 import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
 
 const router = Router();
+const resolutionProofUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_request, file, callback) => callback(null, ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)),
+});
 router.use(requireAuth);
 
 function requireOfficial(request: AuthRequest, response: import("express").Response, next: import("express").NextFunction) {
@@ -24,8 +32,10 @@ router.use(requireOfficial);
 const reportStatusSchema = z.object({
   status: z.enum(["SUBMITTED", "UNDER_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED", "CANCELLED"]),
   notes: z.string().trim().max(1000).optional(),
+  resolutionDetails: z.string().trim().max(2000).optional(),
 });
 const reportFeedbackSchema = z.object({ notes: z.string().trim().min(5).max(1000) });
+const residentCommentSchema = z.object({ comment: z.string().trim().min(5).max(1000) });
 
 router.get("/overview", async (request: AuthRequest, response, next) => {
   try {
@@ -125,9 +135,49 @@ router.post("/reports/:id/feedback", async (request: AuthRequest, response, next
   }
 });
 
-router.patch("/reports/:id/status", async (request: AuthRequest, response, next) => {
+router.post("/reports/:id/resident-comment", async (request: AuthRequest, response, next) => {
   try {
-    const { status, notes } = reportStatusSchema.parse(request.body);
+    const { comment } = residentCommentSchema.parse(request.body);
+    const official = await prisma.barangayOfficial.findFirst({
+      where: { residentId: request.userId },
+      select: { id: true },
+    });
+    if (!official) {
+      response.status(404).json({ error: "Official profile not found" });
+      return;
+    }
+
+    const report = await prisma.infrastructureReport.findFirst({
+      where: { id: String(request.params.id), assignedOfficialId: official.id },
+      select: { id: true, status: true },
+    });
+    if (!report) {
+      response.status(404).json({ error: "This report is not assigned to you" });
+      return;
+    }
+    if (!["RESOLVED", "REJECTED", "CANCELLED"].includes(report.status)) {
+      response.status(409).json({ error: "A resident comment can be added after the report is resolved, rejected, or cancelled" });
+      return;
+    }
+
+    const savedComment = await prisma.barangayAction.create({
+      data: {
+        officialId: official.id,
+        reportId: report.id,
+        actionStatus: "RESIDENT_COMMENT",
+        actionRemarks: comment,
+      },
+      select: { id: true, actionRemarks: true, actionDate: true },
+    });
+    response.status(201).json(savedComment);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/reports/:id/status", resolutionProofUpload.single("resolutionProof"), async (request: AuthRequest, response, next) => {
+  try {
+    const { status, notes, resolutionDetails } = reportStatusSchema.parse(request.body);
     const official = await prisma.barangayOfficial.findFirst({
       where: { residentId: request.userId },
       select: { id: true },
@@ -145,6 +195,8 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
           id: true,
           ticketNumber: true,
           status: true,
+          resolvedAt: true,
+          resolutionDetails: true,
           resident: { select: { firstName: true, phone: true } },
           media: { where: { mediaType: "IMAGE" }, select: { filePath: true, mediaType: true } },
         },
@@ -154,8 +206,15 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
       }
       const updated = await tx.infrastructureReport.update({
         where: { id: assignedReport.id },
-        data: { status, currentStatus: status },
-        select: { id: true, reportId: true, ticketNumber: true, status: true, currentStatus: true },
+        data: {
+          status,
+          currentStatus: status,
+          resolvedAt: status === "RESOLVED"
+            ? assignedReport.status === "RESOLVED" ? assignedReport.resolvedAt ?? new Date() : new Date()
+            : null,
+          resolutionDetails: status === "RESOLVED" ? resolutionDetails ?? assignedReport.resolutionDetails : null,
+        },
+        select: { id: true, reportId: true, ticketNumber: true, status: true, currentStatus: true, resolvedAt: true, resolutionDetails: true },
       });
 
       await tx.barangayAction.create({
@@ -170,8 +229,24 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
       return { ...updated, previousStatus: assignedReport.status, resident: assignedReport.resident, media: assignedReport.media };
     });
 
+    let resolutionProof;
+    if (status === "RESOLVED" && request.file) {
+      const extension = path.extname(request.file.originalname).toLowerCase() || ".jpg";
+      const fileName = `${report.id}-resolution-${crypto.randomUUID()}${extension}`;
+      await storeUpload({
+        localDirectory: path.resolve(process.cwd(), "private-uploads", "reports"),
+        storagePath: `reports/${fileName}`,
+        fileName,
+        buffer: request.file.buffer,
+        contentType: request.file.mimetype,
+      });
+      resolutionProof = await prisma.reportMedia.create({
+        data: { reportId: report.id, filePath: `/private-uploads/reports/${fileName}`, mediaType: "IMAGE", isResolutionProof: true },
+      });
+    }
+
     const imageOptimization = status === "RESOLVED" && report.previousStatus !== "RESOLVED"
-      ? await compressResolvedReportImages(report.media)
+      ? await compressResolvedReportImages(resolutionProof ? [...report.media, resolutionProof] : report.media)
       : undefined;
 
     if (status === "IN_PROGRESS") {
@@ -186,6 +261,8 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
       ticketNumber: report.ticketNumber,
       status: report.status,
       currentStatus: report.currentStatus,
+      resolvedAt: report.resolvedAt,
+      resolutionDetails: report.resolutionDetails,
       smsNotification: status === "IN_PROGRESS" ? "queued" : "not_applicable",
       imageOptimization,
     });

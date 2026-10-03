@@ -191,7 +191,15 @@ router.get("/me", requireAuth, async (request: AuthRequest, response, next) => {
       include: {
         reports: {
           orderBy: { dateSubmitted: "desc" },
-          include: { category: true, media: true },
+          include: {
+            category: true,
+            media: true,
+            actions: {
+              where: { actionStatus: "RESIDENT_COMMENT" },
+              orderBy: { actionDate: "asc" },
+              select: { id: true, actionRemarks: true, actionDate: true },
+            },
+          },
         },
       },
     });

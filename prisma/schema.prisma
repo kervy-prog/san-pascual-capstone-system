@@ -142,6 +142,8 @@ model InfrastructureReport {
   dateSubmitted         DateTime               @default(now())
   ticketNumber          String                 @unique
   status                ReportStatus           @default(SUBMITTED)
+  resolvedAt            DateTime?
+  resolutionDetails     String?
   locationLatitude      Float?
   locationLongitude     Float?
   locationSource        String?
@@ -161,6 +163,7 @@ model ReportMedia {
   reportId   String
   filePath   String
   mediaType  MediaType
+  isResolutionProof Boolean @default(false)
   uploadedAt DateTime             @default(now())
   report     InfrastructureReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 }

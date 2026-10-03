@@ -322,9 +322,31 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
+function renderResolvedReports(reports) {
+  const resolvedReports = reports
+    .filter((report) => report.status === 'RESOLVED')
+    .sort((left, right) => {
+      const leftDate = new Date(left.resolvedAt || left.updatedAt || left.dateSubmitted).getTime();
+      const rightDate = new Date(right.resolvedAt || right.updatedAt || right.dateSubmitted).getTime();
+      return leftDate - rightDate || left.ticketNumber.localeCompare(right.ticketNumber);
+    });
+  document.querySelector('#resolved-report-count').textContent = resolvedReports.length;
+  document.querySelector('#resolved-report-list').innerHTML = resolvedReports.length
+    ? resolvedReports.map((report, index) => {
+      const completionDate = report.resolvedAt
+        ? new Date(report.resolvedAt).toLocaleString('en-PH')
+        : `${new Date(report.updatedAt || report.dateSubmitted).toLocaleString('en-PH')} (last updated; approximate)`;
+      const resident = report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`;
+      return `<tr><td><strong>#${index + 1}</strong></td><td>${escapeHtml(report.ticketNumber)}</td><td>${escapeHtml(report.category.name)}</td><td>${escapeHtml(resident)}</td><td>${escapeHtml(report.resolutionDetails || 'No resolution results provided')}</td><td>${completionDate}</td></tr>`;
+    }).join('')
+    : '<tr><td colspan="6" class="empty-state">No reports resolved yet.</td></tr>';
+}
+
 async function loadReports() {
   try {
-    const reports = (await request('/reports')).filter((report) => report.status !== 'SUBMITTED');
+    const allReports = await request('/reports');
+    renderResolvedReports(allReports);
+    const reports = allReports.filter((report) => report.status !== 'SUBMITTED' && report.status !== 'RESOLVED');
     document.querySelector('#report-list').innerHTML = reports.length
       ? reports.map((report) => {
         const image = report.media?.find((item) => item.mediaType === 'IMAGE');

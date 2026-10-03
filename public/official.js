@@ -108,8 +108,6 @@ function hazardCard(report) {
   let actionButtons = '';
   if (currentStatus === 'SUBMITTED' || currentStatus === 'UNDER_REVIEW') {
     actionButtons = `<button type="button" class="approve-button action-btn" data-action-id="${report.id}" data-action-status="IN_PROGRESS">Start Work (In Progress)</button>`;
-  } else if (currentStatus === 'IN_PROGRESS') {
-    actionButtons = `<button type="button" class="approve-button action-btn" data-action-id="${report.id}" data-action-status="RESOLVED">Mark as Resolved</button>`;
   } else if (currentStatus === 'RESOLVED') {
     actionButtons = `<span class="status-pill" style="color: #065f46; background: #d1fae5;">✓ Resolved</span>`;
   }
@@ -121,8 +119,18 @@ function hazardCard(report) {
   const feedbackForm = !['RESOLVED', 'REJECTED', 'CANCELLED'].includes(currentStatus)
     ? `<form class="field-feedback-form" data-feedback-report-id="${report.id}"><label for="field-feedback-${report.id}">On-site feedback</label><textarea id="field-feedback-${report.id}" name="notes" rows="2" minlength="5" maxlength="1000" placeholder="Example: We need additional tools for this report." required></textarea><button type="submit" class="feedback-button">Save field feedback</button></form>`
     : '';
+  const residentComments = (report.actions || []).filter((action) => action.actionStatus === 'RESIDENT_COMMENT');
+  const residentCommentsHtml = residentComments.length
+    ? `<div class="resident-comment-list"><h4>Comments sent to resident</h4>${residentComments.map((action) => `<p>${escapeHtml(action.actionRemarks)}<small>${formatDate(action.actionDate, true)}</small></p>`).join('')}</div>`
+    : '';
+  const residentCommentForm = ['RESOLVED', 'REJECTED', 'CANCELLED'].includes(currentStatus)
+    ? `<form class="resident-comment-form" data-resident-comment-report-id="${report.id}"><label for="resident-comment-${report.id}">Comment for the resident</label><textarea id="resident-comment-${report.id}" name="comment" rows="2" minlength="5" maxlength="1000" placeholder="Example: We can't finish this for now because of heavy rainfall." required></textarea><button type="submit" class="resident-comment-button">Send comment to resident</button></form>`
+    : '';
+  const resolutionForm = currentStatus === 'IN_PROGRESS'
+    ? `<form class="resolution-form" data-resolution-report-id="${report.id}"><label for="resolution-details-${report.id}">Resolution results <span>(optional)</span></label><textarea id="resolution-details-${report.id}" name="resolutionDetails" rows="3" maxlength="2000" placeholder="Describe the work completed and its result."></textarea><label for="resolution-proof-${report.id}">Photo proof <span>(optional, JPG, PNG, or WebP; up to 5 MB)</span></label><input id="resolution-proof-${report.id}" name="resolutionProof" type="file" accept="image/jpeg,image/png,image/webp" /><button type="submit" class="resolution-button">Mark as resolved</button></form>`
+    : '';
 
-  return `<article class="hazard-card"><div class="hazard-card-head"><div><p class="eyebrow">${report.category.urgencyLevel} PRIORITY</p><h3>${report.category.name}</h3></div><span class="status-pill">${currentStatus.replaceAll('_', ' ')}</span></div><div class="hazard-grid"><div><label>Ticket</label><p>${report.ticketNumber}</p></div><div><label>Reported by</label><p>${resident}</p></div><div><label>Exact location</label><p>${report.exactLocationLandmark}</p></div><div><label>Date submitted</label><p>${formatDate(report.dateSubmitted, true)}</p></div></div><div class="hazard-description"><label>Description</label><p>${report.descriptionOfHazard}</p><small>${mediaHtml}</small></div>${feedbackHtml}${feedbackForm}<div class="hazard-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">${actionButtons}</div></article>`;
+  return `<article class="hazard-card"><div class="hazard-card-head"><div><p class="eyebrow">${report.category.urgencyLevel} PRIORITY</p><h3>${report.category.name}</h3></div><span class="status-pill">${currentStatus.replaceAll('_', ' ')}</span></div><div class="hazard-grid"><div><label>Ticket</label><p>${report.ticketNumber}</p></div><div><label>Reported by</label><p>${resident}</p></div><div><label>Exact location</label><p>${report.exactLocationLandmark}</p></div><div><label>Date submitted</label><p>${formatDate(report.dateSubmitted, true)}</p></div></div><div class="hazard-description"><label>Description</label><p>${report.descriptionOfHazard}</p><small>${mediaHtml}</small></div>${feedbackHtml}${feedbackForm}${resolutionForm}${residentCommentsHtml}${residentCommentForm}<div class="hazard-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">${actionButtons}</div></article>`;
 }
 
 async function updateReportStatus(reportId, newStatus) {
@@ -146,6 +154,34 @@ async function updateReportStatus(reportId, newStatus) {
   }
 }
 
+async function resolveReport(reportId, form) {
+  const submitButton = form.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  const payload = new FormData();
+  payload.append('status', 'RESOLVED');
+  const resolutionDetails = form.elements.resolutionDetails.value.trim();
+  const resolutionProof = form.elements.resolutionProof.files[0];
+  if (resolutionDetails) payload.append('resolutionDetails', resolutionDetails);
+  if (resolutionProof) payload.append('resolutionProof', resolutionProof);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/official/reports/${reportId}/status`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+      body: payload,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to resolve report');
+    message.textContent = `Report ${data.ticketNumber || reportId} marked as resolved.`;
+    message.classList.remove('error');
+    await loadDashboard();
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+    submitButton.disabled = false;
+  }
+}
+
 async function submitFieldFeedback(reportId, notes) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/official/reports/${reportId}/feedback`, {
@@ -156,6 +192,24 @@ async function submitFieldFeedback(reportId, notes) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to save field feedback');
     message.textContent = 'On-site feedback saved for this report.';
+    message.classList.remove('error');
+    await loadDashboard();
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+  }
+}
+
+async function submitResidentComment(reportId, comment) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/official/reports/${reportId}/resident-comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ comment }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to send comment to resident');
+    message.textContent = 'Comment sent to resident.';
     message.classList.remove('error');
     await loadDashboard();
   } catch (error) {
@@ -190,11 +244,24 @@ async function loadDashboard() {
     document.querySelectorAll('.action-btn').forEach((btn) => {
       btn.addEventListener('click', () => updateReportStatus(btn.dataset.actionId, btn.dataset.actionStatus));
     });
+    document.querySelectorAll('.resolution-form').forEach((form) => {
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        resolveReport(form.dataset.resolutionReportId, form);
+      });
+    });
     document.querySelectorAll('.field-feedback-form').forEach((form) => {
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         const notes = form.elements.notes.value.trim();
         if (notes.length >= 5) submitFieldFeedback(form.dataset.feedbackReportId, notes);
+      });
+    });
+    document.querySelectorAll('.resident-comment-form').forEach((form) => {
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const comment = form.elements.comment.value.trim();
+        if (comment.length >= 5) submitResidentComment(form.dataset.residentCommentReportId, comment);
       });
     });
   } catch (error) {

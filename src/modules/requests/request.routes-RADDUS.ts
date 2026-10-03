@@ -9,7 +9,7 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { isWithinSanPascualVicinity } from "./report-geofence.js";
 import { geocodeBarangayCenter, geocodeReportedLandmark } from "../../lib/geocoder.js";
-import { storeUpload } from "../../lib/file-storage.js";
+import { sendStoredFile, storeUpload } from "../../lib/file-storage.js";
 
 const router = Router();
 const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
@@ -52,6 +52,40 @@ router.get("/", async (_request, response, next) => {
       },
     });
     response.json(requests);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/resolution-proof", requireAuth, async (request: AuthRequest, response, next) => {
+  try {
+    if (request.userRole !== "RESIDENT") {
+      response.status(403).json({ error: "Resident access required" });
+      return;
+    }
+    const report = await prisma.infrastructureReport.findFirst({
+      where: { id: String(request.params.id), residentId: request.userId },
+      select: {
+        media: {
+          where: { isResolutionProof: true },
+          orderBy: { uploadedAt: "desc" },
+          take: 1,
+          select: { filePath: true },
+        },
+      },
+    });
+    const proof = report?.media[0];
+    if (!proof) {
+      response.status(404).json({ error: "No resolution proof is available for this report" });
+      return;
+    }
+    const fileName = path.basename(proof.filePath);
+    const found = await sendStoredFile(response, {
+      localDirectory: reportUploadDirectory,
+      storagePath: `reports/${fileName}`,
+      fileName,
+    });
+    if (!found && !response.headersSent) response.status(404).json({ error: "Resolution proof image not found" });
   } catch (error) {
     next(error);
   }

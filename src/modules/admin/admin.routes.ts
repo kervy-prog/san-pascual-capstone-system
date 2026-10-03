@@ -183,12 +183,18 @@ router.patch("/reports/:id/status", async (request, response, next) => {
     const { status } = reportApprovalSchema.parse(request.body);
     const existingReport = await prisma.infrastructureReport.findUnique({
       where: { id: request.params.id },
-      select: { status: true, media: { where: { mediaType: "IMAGE" }, select: { filePath: true, mediaType: true } } },
+      select: { status: true, resolvedAt: true, media: { where: { mediaType: "IMAGE" }, select: { filePath: true, mediaType: true } } },
     });
     const report = await prisma.infrastructureReport.update({
       where: { id: request.params.id },
-      data: { status, currentStatus: status },
-      select: { id: true, reportId: true, ticketNumber: true, status: true, currentStatus: true },
+      data: {
+        status,
+        currentStatus: status,
+        resolvedAt: status === "RESOLVED"
+          ? existingReport?.status === "RESOLVED" ? existingReport.resolvedAt ?? new Date() : new Date()
+          : null,
+      },
+      select: { id: true, reportId: true, ticketNumber: true, status: true, currentStatus: true, resolvedAt: true },
     });
     const imageOptimization = status === "RESOLVED" && existingReport?.status !== "RESOLVED"
       ? await compressResolvedReportImages(existingReport?.media ?? [])
