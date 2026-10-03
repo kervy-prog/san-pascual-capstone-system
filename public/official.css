@@ -3,6 +3,7 @@
 * { box-sizing:border-box; }
 body { margin:0; background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; }
 button { font:inherit; cursor:pointer; }
+.hidden { display:none !important; }
 .official-shell { display:grid; grid-template-columns:245px 1fr; min-height:100vh; }
 .official-sidebar { display:flex; flex-direction:column; padding:31px 24px 25px; color:#dcecf0; background:var(--deep); }
 .official-brand { display:flex; align-items:center; gap:12px; margin-bottom:55px; }
