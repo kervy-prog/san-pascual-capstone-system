@@ -6,6 +6,7 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { sendResidentProgressSms } from "../../lib/semaphore.js";
 import { sendStoredFile } from "../../lib/file-storage.js";
+import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -24,6 +25,7 @@ const reportStatusSchema = z.object({
   status: z.enum(["SUBMITTED", "UNDER_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED", "CANCELLED"]),
   notes: z.string().trim().max(1000).optional(),
 });
+const reportFeedbackSchema = z.object({ notes: z.string().trim().min(5).max(1000) });
 
 router.get("/overview", async (request: AuthRequest, response, next) => {
   try {
@@ -87,6 +89,42 @@ router.get("/reports/media/:fileName", (request, response) => {
   });
 });
 
+router.post("/reports/:id/feedback", async (request: AuthRequest, response, next) => {
+  try {
+    const { notes } = reportFeedbackSchema.parse(request.body);
+    const official = await prisma.barangayOfficial.findFirst({
+      where: { residentId: request.userId },
+      select: { id: true },
+    });
+    if (!official) {
+      response.status(404).json({ error: "Official profile not found" });
+      return;
+    }
+
+    const report = await prisma.infrastructureReport.findFirst({
+      where: { id: String(request.params.id), assignedOfficialId: official.id },
+      select: { id: true },
+    });
+    if (!report) {
+      response.status(404).json({ error: "This report is not assigned to you" });
+      return;
+    }
+
+    const feedback = await prisma.barangayAction.create({
+      data: {
+        officialId: official.id,
+        reportId: report.id,
+        actionStatus: "FIELD_FEEDBACK",
+        actionRemarks: notes,
+      },
+      select: { id: true, actionRemarks: true, actionDate: true },
+    });
+    response.status(201).json(feedback);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch("/reports/:id/status", async (request: AuthRequest, response, next) => {
   try {
     const { status, notes } = reportStatusSchema.parse(request.body);
@@ -103,7 +141,13 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
       const reportId = String(request.params.id);
       const assignedReport = await tx.infrastructureReport.findFirst({
         where: { id: reportId, assignedOfficialId: official.id },
-        select: { id: true, ticketNumber: true, resident: { select: { firstName: true, phone: true } } },
+        select: {
+          id: true,
+          ticketNumber: true,
+          status: true,
+          resident: { select: { firstName: true, phone: true } },
+          media: { where: { mediaType: "IMAGE" }, select: { filePath: true, mediaType: true } },
+        },
       });
       if (!assignedReport) {
         throw new Error("This report is not assigned to you");
@@ -123,8 +167,12 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
         },
       });
 
-      return { ...updated, resident: assignedReport.resident };
+      return { ...updated, previousStatus: assignedReport.status, resident: assignedReport.resident, media: assignedReport.media };
     });
+
+    const imageOptimization = status === "RESOLVED" && report.previousStatus !== "RESOLVED"
+      ? await compressResolvedReportImages(report.media)
+      : undefined;
 
     if (status === "IN_PROGRESS") {
       void sendResidentProgressSms(report.resident.phone, report.ticketNumber).catch((error: unknown) => {
@@ -139,6 +187,7 @@ router.patch("/reports/:id/status", async (request: AuthRequest, response, next)
       status: report.status,
       currentStatus: report.currentStatus,
       smsNotification: status === "IN_PROGRESS" ? "queued" : "not_applicable",
+      imageOptimization,
     });
   } catch (error) {
     next(error);

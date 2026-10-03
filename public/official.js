@@ -3,6 +3,11 @@ const authStorage = sessionStorage.getItem('sanPascualToken') ? sessionStorage :
 const token = authStorage.getItem('sanPascualToken');
 const storedUser = JSON.parse(authStorage.getItem('sanPascualUser') || 'null');
 const message = document.querySelector('#official-message');
+const attachmentModal = document.querySelector('#attachment-modal');
+const attachmentImage = document.querySelector('#attachment-image');
+const attachmentVideo = document.querySelector('#attachment-video');
+const attachmentError = document.querySelector('#attachment-error');
+let attachmentObjectUrl = '';
 
 if (!token || !storedUser || storedUser.role !== 'STAFF') {
   window.location.replace('/');
@@ -15,6 +20,52 @@ document.querySelector('#official-logout').addEventListener('click', () => {
   sessionStorage.removeItem('sanPascualToken');
   sessionStorage.removeItem('sanPascualUser');
   window.location.replace('/');
+});
+
+function closeAttachmentModal() {
+  attachmentModal.classList.add('hidden');
+  attachmentImage.classList.add('hidden');
+  attachmentVideo.classList.add('hidden');
+  attachmentImage.removeAttribute('src');
+  attachmentVideo.removeAttribute('src');
+  attachmentVideo.load();
+  attachmentError.textContent = '';
+  if (attachmentObjectUrl) URL.revokeObjectURL(attachmentObjectUrl);
+  attachmentObjectUrl = '';
+}
+
+document.querySelector('#close-attachment-modal').addEventListener('click', closeAttachmentModal);
+
+async function viewReportAttachment(fileName) {
+  closeAttachmentModal();
+  attachmentModal.classList.remove('hidden');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/official/reports/media/${encodeURIComponent(fileName)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const blob = await response.blob();
+    if (!response.ok) {
+      const errorData = await blob.text().then((text) => JSON.parse(text)).catch(() => ({}));
+      throw new Error(errorData.error || 'Unable to load this report attachment.');
+    }
+    attachmentObjectUrl = URL.createObjectURL(blob);
+    if (blob.type.startsWith('image/')) {
+      attachmentImage.src = attachmentObjectUrl;
+      attachmentImage.classList.remove('hidden');
+    } else if (blob.type.startsWith('video/')) {
+      attachmentVideo.src = attachmentObjectUrl;
+      attachmentVideo.classList.remove('hidden');
+    } else {
+      throw new Error('This attachment format cannot be previewed.');
+    }
+  } catch (error) {
+    attachmentError.textContent = error.message;
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('.attachment-preview-button');
+  if (button) viewReportAttachment(decodeURIComponent(button.dataset.fileName));
 });
 
 document.querySelectorAll('nav a').forEach((link) => {
@@ -31,6 +82,10 @@ function formatDate(value, includeTime = false) {
   return new Intl.DateTimeFormat('en-PH', includeTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }).format(new Date(value));
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
 function reportRow(report) {
   const resident = report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`;
   const reportIdSub = report.reportId && report.reportId !== report.ticketNumber ? `<small>${report.reportId}</small>` : '';
@@ -45,7 +100,7 @@ function hazardCard(report) {
   if (report.media?.length) {
     const mediaLinks = report.media.map((item, idx) => {
       const fileName = item.filePath.split('/').pop();
-      return `<a href="${API_BASE_URL}/api/official/reports/media/${encodeURIComponent(fileName)}" target="_blank" class="document-link">Attachment ${idx + 1} (${item.mediaType.toLowerCase()})</a>`;
+      return `<button type="button" class="attachment-preview-button" data-file-name="${encodeURIComponent(fileName)}">View attachment ${idx + 1} (${item.mediaType.toLowerCase()})</button>`;
     }).join(' · ');
     mediaHtml = `Media: ${mediaLinks}`;
   }
@@ -59,7 +114,15 @@ function hazardCard(report) {
     actionButtons = `<span class="status-pill" style="color: #065f46; background: #d1fae5;">✓ Resolved</span>`;
   }
 
-  return `<article class="hazard-card"><div class="hazard-card-head"><div><p class="eyebrow">${report.category.urgencyLevel} PRIORITY</p><h3>${report.category.name}</h3></div><span class="status-pill">${currentStatus.replaceAll('_', ' ')}</span></div><div class="hazard-grid"><div><label>Ticket</label><p>${report.ticketNumber}</p></div><div><label>Reported by</label><p>${resident}</p></div><div><label>Exact location</label><p>${report.exactLocationLandmark}</p></div><div><label>Date submitted</label><p>${formatDate(report.dateSubmitted, true)}</p></div></div><div class="hazard-description"><label>Description</label><p>${report.descriptionOfHazard}</p><small>${mediaHtml}</small></div><div class="hazard-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">${actionButtons}</div></article>`;
+  const feedback = (report.actions || []).filter((action) => action.actionStatus === 'FIELD_FEEDBACK');
+  const feedbackHtml = feedback.length
+    ? `<div class="field-feedback-list"><h4>On-site feedback</h4>${feedback.map((action) => `<p>${escapeHtml(action.actionRemarks)}<small>${formatDate(action.actionDate, true)}</small></p>`).join('')}</div>`
+    : '';
+  const feedbackForm = !['RESOLVED', 'REJECTED', 'CANCELLED'].includes(currentStatus)
+    ? `<form class="field-feedback-form" data-feedback-report-id="${report.id}"><label for="field-feedback-${report.id}">On-site feedback</label><textarea id="field-feedback-${report.id}" name="notes" rows="2" minlength="5" maxlength="1000" placeholder="Example: We need additional tools for this report." required></textarea><button type="submit" class="feedback-button">Save field feedback</button></form>`
+    : '';
+
+  return `<article class="hazard-card"><div class="hazard-card-head"><div><p class="eyebrow">${report.category.urgencyLevel} PRIORITY</p><h3>${report.category.name}</h3></div><span class="status-pill">${currentStatus.replaceAll('_', ' ')}</span></div><div class="hazard-grid"><div><label>Ticket</label><p>${report.ticketNumber}</p></div><div><label>Reported by</label><p>${resident}</p></div><div><label>Exact location</label><p>${report.exactLocationLandmark}</p></div><div><label>Date submitted</label><p>${formatDate(report.dateSubmitted, true)}</p></div></div><div class="hazard-description"><label>Description</label><p>${report.descriptionOfHazard}</p><small>${mediaHtml}</small></div>${feedbackHtml}${feedbackForm}<div class="hazard-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">${actionButtons}</div></article>`;
 }
 
 async function updateReportStatus(reportId, newStatus) {
@@ -75,6 +138,24 @@ async function updateReportStatus(reportId, newStatus) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to update report status');
     message.textContent = `Report ${data.ticketNumber || reportId} updated to ${newStatus.replaceAll('_', ' ')}.`;
+    message.classList.remove('error');
+    await loadDashboard();
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+  }
+}
+
+async function submitFieldFeedback(reportId, notes) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/official/reports/${reportId}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ notes }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to save field feedback');
+    message.textContent = 'On-site feedback saved for this report.';
     message.classList.remove('error');
     await loadDashboard();
   } catch (error) {
@@ -108,6 +189,13 @@ async function loadDashboard() {
 
     document.querySelectorAll('.action-btn').forEach((btn) => {
       btn.addEventListener('click', () => updateReportStatus(btn.dataset.actionId, btn.dataset.actionStatus));
+    });
+    document.querySelectorAll('.field-feedback-form').forEach((form) => {
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const notes = form.elements.notes.value.trim();
+        if (notes.length >= 5) submitFieldFeedback(form.dataset.feedbackReportId, notes);
+      });
     });
   } catch (error) {
     message.textContent = error.message;

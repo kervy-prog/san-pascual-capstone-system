@@ -58,6 +58,14 @@
       </section>
     </section>
   </main>
+  <div class="official-media-modal hidden" id="attachment-modal" role="dialog" aria-modal="true" aria-labelledby="attachment-modal-title">
+    <div class="official-media-card">
+      <div class="official-media-heading"><h2 id="attachment-modal-title">Report attachment</h2><button type="button" id="close-attachment-modal">Close</button></div>
+      <p id="attachment-error" role="alert"></p>
+      <img id="attachment-image" class="hidden" alt="Infrastructure report attachment" />
+      <video id="attachment-video" class="hidden" controls playsinline></video>
+    </div>
+  </div>
   <script src="/config.js"></script>
   <script src="/official.js" defer></script>
 </body>

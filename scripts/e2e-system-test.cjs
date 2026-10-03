@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const sharp = require('sharp');
 
 const BASE_URL = process.env.API_BASE_URL || 'http://127.0.0.1:3000';
 
@@ -142,6 +144,14 @@ async function run() {
   const offSignupData = await offSignupRes.json();
   await assert(offSignupRes.status === 201, "Official signup with documents returns 201");
   const officialUserId = offSignupData.user.id;
+  const updatedOfficialEmail = `official_updated_${Date.now()}@example.com`;
+  const updateOfficialCredentialsRes = await fetch(`${BASE_URL}/api/admin/accounts/${officialUserId}/credentials`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify({ email: updatedOfficialEmail, password: 'UpdatedOfficial123!' }),
+  });
+  const updatedOfficialCredentials = await updateOfficialCredentialsRes.json();
+  await assert(updateOfficialCredentialsRes.status === 200 && updatedOfficialCredentials.email === updatedOfficialEmail, "Admin updates credentials for a pending official account");
 
   // Admin inspects overview to get official's uploaded files
   const overviewRes = await fetch(`${BASE_URL}/api/admin/overview`, {
@@ -173,7 +183,7 @@ async function run() {
   const offLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: officialEmail, password: 'OfficialPass123!' }),
+    body: JSON.stringify({ email: updatedOfficialEmail, password: 'UpdatedOfficial123!' }),
   });
   const offLoginData = await offLoginRes.json();
   await assert(offLoginRes.status === 200 && offLoginData.token, "Official logs in successfully");
@@ -182,7 +192,7 @@ async function run() {
   // 5. Infrastructure Report Lifecycle (Submit, Upload Media, Admin Review, Official Progress, Resolve)
   console.log("\n[Test 5] Infrastructure Report Lifecycle");
   const reportForm = new FormData();
-  reportForm.append('categoryId', 'drainage');
+  reportForm.append('categoryId', 'residential-issues');
   reportForm.append('exactLocationLandmark', 'Purok 3 near Main Irrigation Canal');
   reportForm.append('descriptionOfHazard', 'Clogged drainage culvert overflowing onto roadway');
   reportForm.append('currentStatus', 'SUBMITTED');
@@ -191,7 +201,9 @@ async function run() {
   reportForm.append('locationLatitude', '15.0178547');
   reportForm.append('locationLongitude', '120.0829188');
 
-  const reportImage = Buffer.from('dummy report photo bytes');
+  const reportImage = await sharp(crypto.randomBytes(512 * 512 * 3), {
+    raw: { width: 512, height: 512, channels: 3 },
+  }).jpeg({ quality: 100 }).toBuffer();
   reportForm.append('media', new Blob([reportImage], { type: 'image/jpeg' }), 'clogged_drain.jpg');
 
   const reportSubmitRes = await fetch(`${BASE_URL}/api/requests`, {
@@ -213,6 +225,7 @@ async function run() {
   const adminReports = await adminReportsRes.json();
   const createdReport = adminReports.find((r) => r.id === reportId);
   await assert(Boolean(createdReport), "Report visible in admin reports database");
+  await assert(createdReport.category.name === 'Residential Issues', "Residential Issues category resolves to its database category");
   await assert(createdReport.media.length === 1, "Report media correctly linked");
 
   const assignReportRes = await fetch(`${BASE_URL}/api/admin/reports/${reportId}/assignment`, {
@@ -231,6 +244,7 @@ async function run() {
     headers: { Authorization: `Bearer ${adminToken}` },
   });
   await assert(adminMediaRes.status === 200, "Admin can load uploaded report media");
+  const mediaSizeBeforeResolution = (await adminMediaRes.arrayBuffer()).byteLength;
 
   // Admin approves report for review
   const adminReviewRes = await fetch(`${BASE_URL}/api/admin/reports/${reportId}/status`, {
@@ -259,6 +273,17 @@ async function run() {
   });
   await assert(offInProgressRes.status === 200, "Official updates report to IN_PROGRESS");
 
+  const fieldFeedbackRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${officialToken}` },
+    body: JSON.stringify({ notes: 'We need additional tools for this report.' }),
+  });
+  const fieldFeedback = await fieldFeedbackRes.json();
+  await assert(fieldFeedbackRes.status === 201 && fieldFeedback.actionRemarks === 'We need additional tools for this report.', "Official saves on-site report feedback");
+  const adminReportsWithFeedback = await (await fetch(`${BASE_URL}/api/admin/reports`, { headers: { Authorization: `Bearer ${adminToken}` } })).json();
+  const reportWithFeedback = adminReportsWithFeedback.find((report) => report.id === reportId);
+  await assert(reportWithFeedback.actions.some((action) => action.actionStatus === 'FIELD_FEEDBACK' && action.actionRemarks === fieldFeedback.actionRemarks), "Saved field feedback is visible through admin report records");
+
   // Official updates status to RESOLVED
   const offResolvedRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/status`, {
     method: 'PATCH',
@@ -266,6 +291,11 @@ async function run() {
     body: JSON.stringify({ status: 'RESOLVED', notes: 'Culvert cleared and water flow restored' }),
   });
   await assert(offResolvedRes.status === 200, "Official marks report as RESOLVED");
+  const resolvedMediaRes = await fetch(`${BASE_URL}/api/admin/reports/media/${encodeURIComponent(mediaFileName)}`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  const mediaSizeAfterResolution = (await resolvedMediaRes.arrayBuffer()).byteLength;
+  await assert(resolvedMediaRes.status === 200 && mediaSizeAfterResolution < mediaSizeBeforeResolution, "Report image is smaller after resolution");
 
   // Verify Admin dashboard progress metrics
   const adminFinalOverview = await (await fetch(`${BASE_URL}/api/admin/overview`, { headers: { Authorization: `Bearer ${adminToken}` } })).json();

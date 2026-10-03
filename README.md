@@ -78,7 +78,7 @@ For phone or another laptop access on the same Wi-Fi, open `http://<computer-ip>
 - If both GPS sources are unavailable, the API uses a clearly labeled approximate Barangay San Pascual area pin instead of blocking the report; it is not presented as the exact image location.
 - New reports wait in the admin **Report approval** section.
 - Admins approve and assign reports to approved officials.
-- Assigned officials update inspection and resolution status.
+- Assigned officials update inspection and resolution status. When a report is first marked resolved, supported JPEG, PNG, and WebP photos are recompressed in place when the result is smaller; saved report location data is unchanged.
 - Residents see status changes automatically in their report history.
 - When an official changes a report to `IN_PROGRESS`, Semaphore sends the resident an SMS notification.
 - Admins can view uploaded images and their GPS-confirmed or landmark-based location.

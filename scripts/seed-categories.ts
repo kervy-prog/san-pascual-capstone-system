@@ -6,6 +6,7 @@ const categories = [
   { name: "Water and sanitation", description: "Water supply, sanitation, and wastewater concerns", urgencyLevel: "HIGH" },
   { name: "Electricity and power", description: "Electrical lines, lighting, and power infrastructure concerns", urgencyLevel: "HIGH" },
   { name: "Public facility", description: "Barangay buildings and shared public facilities", urgencyLevel: "MEDIUM" },
+  { name: "Residential Issues", description: "Hazards and infrastructure concerns affecting residential areas", urgencyLevel: "MEDIUM" },
   { name: "Other", description: "Other infrastructure concerns", urgencyLevel: "MEDIUM" },
 ];
 

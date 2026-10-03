@@ -1,10 +1,12 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import path from "node:path";
 import fs from "node:fs";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAdmin } from "../../middleware/require-admin.js";
 import { sendStoredFile } from "../../lib/file-storage.js";
+import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -14,6 +16,16 @@ const officialStatusSchema = z.object({ status: z.enum(["ACTIVE", "RETIRED", "NO
 const reportApprovalSchema = z.object({ status: z.enum(["SUBMITTED", "UNDER_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED", "CANCELLED"]) });
 const reportAssignmentSchema = z.object({ officialId: z.string().cuid().nullable() });
 const reportGeofenceSchema = z.object({ enforceReportGeofence: z.boolean() });
+const accountCredentialsSchema = z.object({
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128, "Password must not exceed 128 characters")
+    .regex(/[a-z]/, "Password must include a lowercase letter")
+    .regex(/[A-Z]/, "Password must include an uppercase letter")
+    .regex(/[0-9]/, "Password must include a number")
+    .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/, "Password must include a special character"),
+});
 
 router.get("/settings/report-geofence", async (_request, response, next) => {
   try {
@@ -137,7 +149,7 @@ router.get("/reports", async (_request, response, next) => {
   try {
     const reports = await prisma.infrastructureReport.findMany({
       orderBy: { dateSubmitted: "desc" },
-      include: { resident: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } }, category: true, media: true, actions: true, assignedOfficial: { include: { resident: { select: { firstName: true, lastName: true } } } } },
+      include: { resident: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } }, category: true, media: true, actions: { include: { official: { include: { resident: { select: { firstName: true, lastName: true } } } } } }, assignedOfficial: { include: { resident: { select: { firstName: true, lastName: true } } } } },
     });
     response.json(reports);
   } catch (error) {
@@ -169,12 +181,19 @@ router.get("/residents/documents/:fileName", (request, response) => {
 router.patch("/reports/:id/status", async (request, response, next) => {
   try {
     const { status } = reportApprovalSchema.parse(request.body);
+    const existingReport = await prisma.infrastructureReport.findUnique({
+      where: { id: request.params.id },
+      select: { status: true, media: { where: { mediaType: "IMAGE" }, select: { filePath: true, mediaType: true } } },
+    });
     const report = await prisma.infrastructureReport.update({
       where: { id: request.params.id },
       data: { status, currentStatus: status },
       select: { id: true, reportId: true, ticketNumber: true, status: true, currentStatus: true },
     });
-    response.json(report);
+    const imageOptimization = status === "RESOLVED" && existingReport?.status !== "RESOLVED"
+      ? await compressResolvedReportImages(existingReport?.media ?? [])
+      : undefined;
+    response.json({ ...report, imageOptimization });
   } catch (error) {
     next(error);
   }
@@ -213,6 +232,37 @@ router.patch("/officials/:id/status", async (request, response, next) => {
       select: { id: true, status: true, resident: { select: { firstName: true, lastName: true } } },
     });
     response.json(official);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/accounts/:id/credentials", async (request, response, next) => {
+  try {
+    const { email, password } = accountCredentialsSchema.parse(request.body);
+    const accountId = String(request.params.id);
+    const account = await prisma.resident.findUnique({
+      where: { id: accountId },
+      select: { id: true, role: true, approvalStatus: true },
+    });
+    if (!account || account.role !== "STAFF" || account.approvalStatus !== "PENDING") {
+      response.status(404).json({ error: "Only pending Barangay Official accounts can be edited here" });
+      return;
+    }
+
+    const emailOwner = await prisma.resident.findUnique({ where: { email }, select: { id: true } });
+    if (emailOwner && emailOwner.id !== account.id) {
+      response.status(409).json({ error: "An account with this email already exists" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const updated = await prisma.resident.update({
+      where: { id: account.id },
+      data: { email, passwordHash },
+      select: { id: true, email: true, role: true, approvalStatus: true },
+    });
+    response.json(updated);
   } catch (error) {
     next(error);
   }

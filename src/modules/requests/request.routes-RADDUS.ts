@@ -24,6 +24,7 @@ const categoryNames: Record<string, string> = {
   water: "Water and sanitation",
   electricity: "Electricity and power",
   "public-facility": "Public facility",
+  "residential-issues": "Residential Issues",
   other: "Other",
 };
 

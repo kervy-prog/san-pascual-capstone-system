@@ -13,6 +13,9 @@ const verificationDocumentImage = document.querySelector('#verification-document
 const verificationDocumentPdf = document.querySelector('#verification-document-pdf');
 const verificationDocumentError = document.querySelector('#verification-document-error');
 let verificationDocumentUrl = '';
+const accountCredentialsModal = document.querySelector('#account-credentials-modal');
+const accountCredentialsForm = document.querySelector('#account-credentials-form');
+const accountCredentialsError = document.querySelector('#account-credentials-error');
 let approvedOfficials = [];
 const reportGeofenceToggle = document.querySelector('#report-geofence-toggle');
 const geofenceStatus = document.querySelector('#geofence-status');
@@ -41,6 +44,50 @@ function closeVerificationDocument() {
 }
 
 document.querySelector('#close-verification-document').addEventListener('click', closeVerificationDocument);
+
+function closeAccountCredentialsModal() {
+  accountCredentialsModal.classList.add('hidden');
+  accountCredentialsForm.reset();
+  accountCredentialsError.textContent = '';
+}
+
+document.querySelector('#close-account-credentials').addEventListener('click', closeAccountCredentialsModal);
+
+document.querySelector('#approval-list').addEventListener('click', (event) => {
+  const button = event.target.closest('.edit-official-credentials');
+  if (!button) return;
+  document.querySelector('#account-credentials-id').value = button.dataset.accountId;
+  document.querySelector('#account-credentials-email').value = button.dataset.accountEmail;
+  document.querySelector('#account-credentials-name').textContent = `Pending official: ${button.dataset.accountName}`;
+  accountCredentialsModal.classList.remove('hidden');
+  document.querySelector('#account-credentials-password').focus();
+});
+
+accountCredentialsForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const saveButton = accountCredentialsForm.querySelector('[type="submit"]');
+  saveButton.disabled = true;
+  accountCredentialsError.textContent = '';
+  try {
+    const accountId = document.querySelector('#account-credentials-id').value;
+    const updated = await request(`/accounts/${encodeURIComponent(accountId)}/credentials`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: document.querySelector('#account-credentials-email').value,
+        password: document.querySelector('#account-credentials-password').value,
+      }),
+    });
+    closeAccountCredentialsModal();
+    message.textContent = `Sign-in details updated for ${updated.email}.`;
+    message.classList.remove('error');
+    await loadDashboard();
+  } catch (error) {
+    accountCredentialsError.textContent = error.message;
+  } finally {
+    saveButton.disabled = false;
+  }
+});
 
 async function viewVerificationDocument(url, title) {
   closeVerificationDocument();
@@ -188,7 +235,8 @@ function accountCard(account) {
   }
   const residencyIdFile = account.residencyIdFile ? account.residencyIdFile.split('/').pop() : '';
   const residencyIdLink = residencyIdFile ? `<p class="documents">Proof of residency: <a href="#" data-document-url="${API_BASE_URL}/api/admin/residents/documents/${encodeURIComponent(residencyIdFile)}" data-document-title="Resident Proof of Residency" class="document-link">View submitted ID</a></p>` : '<p class="documents">Proof of residency: None received</p>';
-  return `<article class="approval-card"><div class="account-avatar">${account.firstName[0]}${account.lastName[0]}</div><div class="account-details"><div class="account-title"><h3>${account.firstName} ${account.middleName} ${account.lastName}</h3><span class="pending-badge">Pending</span></div><p>${account.email} · ${account.phone}</p><p>${account.address}, ${account.barangay}, ${account.municipality}, ${account.province}</p>${residencyIdLink}${extra}<small>Submitted ${new Date(account.createdAt).toLocaleDateString('en-PH')}</small></div><div class="approval-actions"><button class="approve-button" data-id="${account.id}" data-status="APPROVED">Approve</button><button class="reject-button" data-id="${account.id}" data-status="REJECTED">Reject</button></div></article>`;
+  const credentialButton = official ? `<button type="button" class="edit-official-credentials" data-account-id="${account.id}" data-account-email="${escapeHtml(account.email)}" data-account-name="${escapeHtml(`${account.firstName} ${account.lastName}`)}">Edit sign-in</button>` : '';
+  return `<article class="approval-card"><div class="account-avatar">${account.firstName[0]}${account.lastName[0]}</div><div class="account-details"><div class="account-title"><h3>${account.firstName} ${account.middleName} ${account.lastName}</h3><span class="pending-badge">Pending</span></div><p>${account.email} · ${account.phone}</p><p>${account.address}, ${account.barangay}, ${account.municipality}, ${account.province}</p>${residencyIdLink}${extra}<small>Submitted ${new Date(account.createdAt).toLocaleDateString('en-PH')}</small></div><div class="approval-actions">${credentialButton}<button class="approve-button" data-id="${account.id}" data-status="APPROVED">Approve</button><button class="reject-button" data-id="${account.id}" data-status="REJECTED">Reject</button></div></article>`;
 }
 
 function renderReportProgress(progress) {
@@ -270,6 +318,10 @@ function statusControl(report) {
   return `<span class="status-pill">${(report.currentStatus || report.status).replace('_', ' ')}</span><select class="report-status" data-report-id="${report.id}">${statuses.map((status) => `<option value="${status}" ${status === report.status ? 'selected' : ''}>${status.replace('_', ' ')}</option>`).join('')}</select>`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
 async function loadReports() {
   try {
     const reports = (await request('/reports')).filter((report) => report.status !== 'SUBMITTED');
@@ -277,7 +329,12 @@ async function loadReports() {
       ? reports.map((report) => {
         const image = report.media?.find((item) => item.mediaType === 'IMAGE');
         const mediaAction = image ? reportMediaButton(image, report) : '<span class="muted-note">No image</span>';
-        return `<tr><td><strong>${report.reportId || report.ticketNumber}</strong></td><td>${report.ticketNumber}</td><td>${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td>${report.category.urgencyLevel}</td><td>${report.exactLocationLandmark}</td><td>${report.descriptionOfHazard}</td><td>${assignmentControl(report)}</td><td>${statusControl(report)}</td><td>${mediaAction}</td><td>${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
+        const feedbackNotes = (report.actions || []).filter((action) => action.actionStatus === 'FIELD_FEEDBACK');
+        const feedbackHtml = feedbackNotes.map((action) => {
+          const officialName = action.official?.resident ? `${action.official.resident.firstName} ${action.official.resident.lastName}` : 'Barangay official';
+          return `<div class="field-feedback-note"><strong>${escapeHtml(officialName)} · On-site feedback</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
+        }).join('');
+        return `<tr><td><strong>${report.reportId || report.ticketNumber}</strong></td><td>${report.ticketNumber}</td><td>${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td>${report.category.urgencyLevel}</td><td>${report.exactLocationLandmark}</td><td>${report.descriptionOfHazard}${feedbackHtml}</td><td>${assignmentControl(report)}</td><td>${statusControl(report)}</td><td>${mediaAction}</td><td>${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
       }).join('')
       : '<tr><td colspan="11" class="empty-state">No reports submitted yet.</td></tr>';
     document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath, button.dataset)));
