@@ -9,11 +9,22 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 import { isWithinSanPascualVicinity } from "./report-geofence.js";
 import { geocodeBarangayCenter, geocodeReportedLandmark } from "../../lib/geocoder.js";
-import { sendStoredFile, storeUpload } from "../../lib/file-storage.js";
+import { createSignedReportUploadUrl, isDirectUploadConfigured, readStoredUpload, sendStoredFile, storeUpload } from "../../lib/file-storage.js";
 
 const router = Router();
 const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
 const maxReportMediaBytes = 4 * 1024 * 1024;
+const maxDirectUploadFileBytes = 10 * 1024 * 1024;
+const maxDirectUploadReportBytes = 25 * 1024 * 1024;
+const reportMimeExtensions: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+  "video/quicktime": ".mov",
+};
 const reportUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: maxReportMediaBytes, files: 5 },
@@ -40,6 +51,12 @@ const createRequestSchema = z.object({
   submitAnonymously: z.preprocess((value) => value === true || value === "true", z.boolean()).optional(),
   locationLatitude: z.coerce.number().min(-90).max(90).optional(),
   locationLongitude: z.coerce.number().min(-180).max(180).optional(),
+  uploadedMedia: z.array(z.object({
+    storagePath: z.string().min(1).max(300),
+    originalname: z.string().trim().min(1).max(255),
+    mimetype: z.string().trim().min(1).max(120),
+    size: z.number().int().positive().max(maxDirectUploadFileBytes),
+  })).max(5).optional(),
 });
 
 router.get("/", async (_request, response, next) => {
@@ -93,6 +110,35 @@ router.get("/:id/resolution-proof", requireAuth, async (request: AuthRequest, re
   }
 });
 
+router.post("/uploads/sign", requireAuth, async (request: AuthRequest, response, next) => {
+  try {
+    if (!request.userId) {
+      response.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (request.userRole !== "RESIDENT") {
+      response.status(403).json({ error: "Resident access required" });
+      return;
+    }
+    if (!isDirectUploadConfigured()) {
+      response.status(503).json({ error: "Direct uploads are unavailable; cloud storage configuration is required for files over 4 MB." });
+      return;
+    }
+    const input = z.object({
+      fileName: z.string().trim().min(1).max(255),
+      contentType: z.string().trim().refine((value) => Object.hasOwn(reportMimeExtensions, value), "Choose a supported photo or video format"),
+      size: z.number().int().positive().max(maxDirectUploadFileBytes),
+    }).parse(request.body);
+    const extension = reportMimeExtensions[input.contentType];
+    const fileName = `${request.userId}-upload-${crypto.randomUUID()}${extension}`;
+    const storagePath = `reports/${fileName}`;
+    const signedUpload = await createSignedReportUploadUrl(storagePath);
+    response.status(201).json({ storagePath, ...signedUpload });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/", requireAuth, reportUpload.array("media", 5), async (request: AuthRequest, response, next) => {
   try {
     const input = createRequestSchema.parse(request.body);
@@ -115,11 +161,33 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     const allowedUrgencyLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
     const urgencyLevel = input.urgencyLevel
       ?? (allowedUrgencyLevels.includes(category.urgencyLevel) ? category.urgencyLevel : "MEDIUM");
-    const files = (request.files as Express.Multer.File[] | undefined) || [];
-    if (files.reduce((total, file) => total + file.size, 0) > maxReportMediaBytes) {
-      response.status(413).json({ error: "Report photos and videos must total no more than 4 MB." });
+    const multipartFiles = (request.files as Express.Multer.File[] | undefined) || [];
+    const uploadedMedia = input.uploadedMedia || [];
+    if (multipartFiles.length > 0 && uploadedMedia.length > 0) {
+      response.status(400).json({ error: "Use either direct uploads or multipart media, not both." });
       return;
     }
+    const totalDirectUploadBytes = uploadedMedia.reduce((total, file) => total + file.size, 0);
+    if (totalDirectUploadBytes > maxDirectUploadReportBytes) {
+      response.status(413).json({ error: "Report media must total no more than 25 MB." });
+      return;
+    }
+    if (multipartFiles.reduce((total, file) => total + file.size, 0) > maxReportMediaBytes) {
+      response.status(413).json({ error: "Report photos and videos must total no more than 4 MB when direct cloud uploads are unavailable." });
+      return;
+    }
+    const directFiles = await Promise.all(uploadedMedia.map(async (file) => {
+      const expectedPrefix = `reports/${request.userId}-upload-`;
+      if (!file.storagePath.startsWith(expectedPrefix) || file.storagePath.includes("..") || file.storagePath.includes("\\")) {
+        throw new Error("Uploaded media reference is invalid");
+      }
+      const buffer = await readStoredUpload(file.storagePath);
+      if (buffer.length !== file.size || buffer.length > maxDirectUploadFileBytes) {
+        throw new Error("Uploaded media size did not match its signed upload request");
+      }
+      return { ...file, buffer };
+    }));
+    const files = [...multipartFiles, ...directFiles];
     const imageFiles = files.filter((file) => file.mimetype.startsWith("image/"));
     const geofenceSetting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
     const enforceReportGeofence = geofenceSetting?.value ?? true;
@@ -181,9 +249,12 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     if (files.length > 0) {
       await prisma.reportMedia.createMany({
         data: await Promise.all(files.map(async (file) => {
+          const directStoragePath = "storagePath" in file ? file.storagePath : undefined;
           const extension = path.extname(file.originalname).toLowerCase() || ".bin";
-          const fileName = `${created.id}-${crypto.randomUUID()}${extension}`;
-          await storeUpload({ localDirectory: reportUploadDirectory, storagePath: `reports/${fileName}`, fileName, buffer: file.buffer, contentType: file.mimetype });
+          const fileName = directStoragePath ? path.basename(directStoragePath) : `${created.id}-${crypto.randomUUID()}${extension}`;
+          if (!directStoragePath) {
+            await storeUpload({ localDirectory: reportUploadDirectory, storagePath: `reports/${fileName}`, fileName, buffer: file.buffer, contentType: file.mimetype });
+          }
           return {
             reportId: created.id,
             filePath: `/private-uploads/reports/${fileName}`,

@@ -12,6 +12,7 @@ const envSchema = z.object({
   SEMAPHORE_SENDER_NAME: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).max(11).default("SANPASCUAL")),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_STORAGE_BUCKET: z.string().min(1).default("private-uploads"),
 });
 

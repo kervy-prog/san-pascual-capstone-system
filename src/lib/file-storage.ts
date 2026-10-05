@@ -10,8 +10,48 @@ function isCloudStorageConfigured() {
   return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+export function isDirectUploadConfigured() {
+  return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SUPABASE_ANON_KEY);
+}
+
 function storageUrl(storagePath: string) {
   return `${env.SUPABASE_URL}/storage/v1/object/${bucket}/${storagePath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+export async function createSignedReportUploadUrl(storagePath: string) {
+  if (!isDirectUploadConfigured()) throw new Error("Direct uploads are not configured");
+  const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`${env.SUPABASE_URL}/storage/v1/object/upload/sign/${bucket}/${encodedPath}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ upsert: false }),
+    signal: AbortSignal.timeout(8000),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || typeof result.url !== "string") {
+    throw new Error(`Unable to create signed report upload URL (${response.status})`);
+  }
+  const signedUrl = /^https?:\/\//i.test(result.url)
+    ? result.url
+    : `${env.SUPABASE_URL}/storage/v1${result.url.startsWith("/") ? result.url : `/${result.url}`}`;
+  return { signedUrl, uploadApiKey: env.SUPABASE_ANON_KEY! };
+}
+
+export async function readStoredUpload(storagePath: string) {
+  if (!isCloudStorageConfigured()) throw new Error("Cloud storage is not configured");
+  const response = await fetch(storageUrl(storagePath), {
+    headers: {
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY!,
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`Unable to read uploaded report media (${response.status})`);
+  return Buffer.from(await response.arrayBuffer());
 }
 
 export async function storeUpload(options: {

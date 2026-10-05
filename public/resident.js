@@ -14,6 +14,9 @@ const reportModalKicker = document.querySelector('#report-modal-kicker');
 const reportModalIcon = document.querySelector('#report-modal-icon');
 const closeReportModalLabel = document.querySelector('#close-report-modal-label');
 let selectedMediaFiles = [];
+const maxMediaFileBytes = 10 * 1024 * 1024;
+const maxReportMediaBytes = 25 * 1024 * 1024;
+const maxMultipartMediaBytes = 4 * 1024 * 1024;
 const resolutionProofModal = document.querySelector('#resolution-proof-modal');
 const resolutionProofImage = document.querySelector('#resolution-proof-image');
 const resolutionProofError = document.querySelector('#resolution-proof-error');
@@ -94,17 +97,21 @@ function renderMediaPreview() {
 
 reportMediaInput.addEventListener('change', () => {
   const incomingFiles = Array.from(reportMediaInput.files || []);
-  const maxMediaBytes = 4 * 1024 * 1024;
   let selectedBytes = selectedMediaFiles.reduce((total, file) => total + file.size, 0);
   let tooManyFiles = false;
-  let tooLarge = false;
+  let fileTooLarge = false;
+  let reportTooLarge = false;
   for (const file of incomingFiles) {
     if (selectedMediaFiles.length >= 5) {
       tooManyFiles = true;
       continue;
     }
-    if (selectedBytes + file.size > maxMediaBytes) {
-      tooLarge = true;
+    if (file.size > maxMediaFileBytes) {
+      fileTooLarge = true;
+      continue;
+    }
+    if (selectedBytes + file.size > maxReportMediaBytes) {
+      reportTooLarge = true;
       continue;
     }
     selectedMediaFiles.push(file);
@@ -112,9 +119,44 @@ reportMediaInput.addEventListener('change', () => {
   }
   reportMediaInput.value = '';
   renderMediaPreview();
-  if (tooLarge) showReportMessage('Report photos and videos must total no more than 4 MB.', true);
+  if (fileTooLarge) showReportMessage('Each photo or video must be 10 MB or smaller.', true);
+  else if (reportTooLarge) showReportMessage('All report photos and videos must total no more than 25 MB.', true);
   else if (tooManyFiles) showReportMessage('You can upload a maximum of 5 media files.', true);
 });
+
+async function uploadReportMediaDirectly(files) {
+  const uploadedMedia = [];
+  for (const file of files) {
+    const signResponse = await fetch(`${API_BASE_URL}/api/requests/uploads/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
+    });
+    const signedUpload = await signResponse.json().catch(() => ({}));
+    if (signResponse.status === 503 && uploadedMedia.length === 0) return null;
+    if (!signResponse.ok) throw new Error(signedUpload.error || `Unable to prepare media upload (HTTP ${signResponse.status}).`);
+
+    const uploadResponse = await fetch(signedUpload.signedUrl, {
+      method: 'PUT',
+      headers: {
+        apikey: signedUpload.uploadApiKey,
+        'Content-Type': file.type,
+        'x-upsert': 'false',
+      },
+      body: file,
+    });
+    if (!uploadResponse.ok) {
+      throw new Error(`Unable to upload ${file.name} to cloud storage (HTTP ${uploadResponse.status}). No report was submitted.`);
+    }
+    uploadedMedia.push({
+      storagePath: signedUpload.storagePath,
+      originalname: file.name,
+      mimetype: file.type,
+      size: file.size,
+    });
+  }
+  return uploadedMedia;
+}
 
 function closeReportModal() {
   reportSuccessModal.classList.add('hidden');
@@ -196,7 +238,6 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
   payload.append('currentStatus', 'SUBMITTED');
   payload.append('dateSubmitted', submittedAt);
   payload.append('submitAnonymously', 'false');
-  mediaFiles.forEach((file) => payload.append('media', file));
 
   if (!categoryId || !urgencyLevel || !exactLocationLandmark || !descriptionOfHazard || !reportDateInput?.value) {
     showReportMessage('Please choose a category and urgency, then complete the location and description.', true);
@@ -215,19 +256,48 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
   submitReportButton.disabled = true;
   submitReportButton.querySelector('span').textContent = 'Submitting...';
   try {
+    let currentLocation;
     if (mediaFiles.length > 0) {
       try {
-        const currentLocation = await getCurrentLocation();
+        currentLocation = await getCurrentLocation();
         payload.append('locationLatitude', String(currentLocation.latitude));
         payload.append('locationLongitude', String(currentLocation.longitude));
       } catch {
         // The server will still inspect the image's EXIF GPS metadata.
       }
     }
+    let uploadedMedia;
+    if (mediaFiles.length > 0) {
+      uploadedMedia = await uploadReportMediaDirectly(mediaFiles);
+      if (uploadedMedia === null) {
+        const totalMediaBytes = mediaFiles.reduce((total, file) => total + file.size, 0);
+        if (totalMediaBytes > maxMultipartMediaBytes) {
+          throw new Error('Large uploads need cloud storage, which is not configured for this deployment. Ask the administrator to configure Supabase Storage or use media totaling 4 MB or less.');
+        }
+        mediaFiles.forEach((file) => payload.append('media', file));
+      }
+    }
+    const headers = { Authorization: `Bearer ${token}` };
+    let requestBody = payload;
+    if (uploadedMedia) {
+      headers['Content-Type'] = 'application/json';
+      requestBody = JSON.stringify({
+        categoryId,
+        urgencyLevel,
+        exactLocationLandmark,
+        descriptionOfHazard,
+        currentStatus: 'SUBMITTED',
+        dateSubmitted: submittedAt,
+        submitAnonymously: false,
+        locationLatitude: currentLocation?.latitude,
+        locationLongitude: currentLocation?.longitude,
+        uploadedMedia,
+      });
+    }
     const response = await fetch(`${API_BASE_URL}/api/requests`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: payload,
+      headers,
+      body: requestBody,
     });
     const responseText = await response.text();
     let data = {};
@@ -241,7 +311,7 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
         ? Object.values(data.details).flat().filter(Boolean).join(' ')
         : '';
       const statusMessage = response.status === 413
-        ? 'Report upload is too large. Photos and videos must total no more than 4 MB.'
+        ? 'Report upload exceeds the configured storage limit. Photos and videos can total up to 25 MB when cloud storage is enabled.'
         : `Unable to submit infrastructure report (HTTP ${response.status}). Please try again.`;
       throw new Error(validationDetails || data.error || statusMessage);
     }

@@ -217,10 +217,43 @@ async function run() {
   }).jpeg({ quality: 100 }).toBuffer();
   reportForm.append('media', new Blob([reportImage], { type: 'image/jpeg' }), 'clogged_drain.jpg');
 
+  const signedUploadRes = await fetch(`${BASE_URL}/api/requests/uploads/sign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${residentToken}` },
+    body: JSON.stringify({ fileName: 'clogged_drain.jpg', contentType: 'image/jpeg', size: reportImage.length }),
+  });
+  let reportSubmitBody = reportForm;
+  const reportSubmitHeaders = { Authorization: `Bearer ${residentToken}` };
+  if (signedUploadRes.status === 201) {
+    const signedUpload = await signedUploadRes.json();
+    const directUploadRes = await fetch(signedUpload.signedUrl, {
+      method: 'PUT',
+      headers: { apikey: signedUpload.uploadApiKey, 'Content-Type': 'image/jpeg', 'x-upsert': 'false' },
+      body: reportImage,
+    });
+    await assert(directUploadRes.ok, "Resident uploads report media directly to signed cloud storage");
+    reportSubmitHeaders['Content-Type'] = 'application/json';
+    reportSubmitBody = JSON.stringify({
+      categoryId: 'residential-issues',
+      urgencyLevel: 'CRITICAL',
+      exactLocationLandmark: 'Purok 3 near Main Irrigation Canal',
+      descriptionOfHazard: 'Clogged drainage culvert overflowing onto roadway',
+      currentStatus: 'SUBMITTED',
+      dateSubmitted: new Date().toISOString(),
+      submitAnonymously: false,
+      locationLatitude: 15.0178547,
+      locationLongitude: 120.0829188,
+      uploadedMedia: [{ storagePath: signedUpload.storagePath, originalname: 'clogged_drain.jpg', mimetype: 'image/jpeg', size: reportImage.length }],
+    });
+  } else {
+    const signedUploadError = await signedUploadRes.json().catch(() => ({}));
+    await assert(signedUploadRes.status === 503, `Direct cloud uploads unavailable locally; multipart fallback is used (${signedUploadError.error || signedUploadRes.status})`);
+  }
+
   const reportSubmitRes = await fetch(`${BASE_URL}/api/requests`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${residentToken}` },
-    body: reportForm,
+    headers: reportSubmitHeaders,
+    body: reportSubmitBody,
   });
   const reportSubmitData = await reportSubmitRes.json();
   await assert(reportSubmitRes.status === 201, "Resident submits infrastructure report successfully");
