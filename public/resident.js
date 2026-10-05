@@ -94,13 +94,26 @@ function renderMediaPreview() {
 
 reportMediaInput.addEventListener('change', () => {
   const incomingFiles = Array.from(reportMediaInput.files || []);
-  const availableSlots = 5 - selectedMediaFiles.length;
-  selectedMediaFiles.push(...incomingFiles.slice(0, availableSlots));
-  if (incomingFiles.length > availableSlots) {
-    showReportMessage('You can upload a maximum of 5 media files.', true);
+  const maxMediaBytes = 4 * 1024 * 1024;
+  let selectedBytes = selectedMediaFiles.reduce((total, file) => total + file.size, 0);
+  let tooManyFiles = false;
+  let tooLarge = false;
+  for (const file of incomingFiles) {
+    if (selectedMediaFiles.length >= 5) {
+      tooManyFiles = true;
+      continue;
+    }
+    if (selectedBytes + file.size > maxMediaBytes) {
+      tooLarge = true;
+      continue;
+    }
+    selectedMediaFiles.push(file);
+    selectedBytes += file.size;
   }
   reportMediaInput.value = '';
   renderMediaPreview();
+  if (tooLarge) showReportMessage('Report photos and videos must total no more than 4 MB.', true);
+  else if (tooManyFiles) showReportMessage('You can upload a maximum of 5 media files.', true);
 });
 
 function closeReportModal() {
@@ -216,12 +229,21 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
       headers: { Authorization: `Bearer ${token}` },
       body: payload,
     });
-    const data = await response.json().catch(() => ({}));
+    const responseText = await response.text();
+    let data = {};
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      data = {};
+    }
     if (!response.ok) {
       const validationDetails = data.details
         ? Object.values(data.details).flat().filter(Boolean).join(' ')
         : '';
-      throw new Error(validationDetails || data.error || 'Unable to submit infrastructure report.');
+      const statusMessage = response.status === 413
+        ? 'Report upload is too large. Photos and videos must total no more than 4 MB.'
+        : `Unable to submit infrastructure report (HTTP ${response.status}). Please try again.`;
+      throw new Error(validationDetails || data.error || statusMessage);
     }
 
     showReportMessage('Infrastructure report submitted successfully.');

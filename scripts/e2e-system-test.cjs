@@ -191,6 +191,16 @@ async function run() {
 
   // 5. Infrastructure Report Lifecycle (Submit, Upload Media, Admin Review, Official Progress, Resolve)
   console.log("\n[Test 5] Infrastructure Report Lifecycle");
+  const oversizedReportForm = new FormData();
+  oversizedReportForm.append('media', new Blob([Buffer.alloc(4 * 1024 * 1024 + 1)], { type: 'video/mp4' }), 'oversized.mp4');
+  const oversizedReportRes = await fetch(`${BASE_URL}/api/requests`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${residentToken}` },
+    body: oversizedReportForm,
+  });
+  const oversizedReportData = await oversizedReportRes.json();
+  await assert(oversizedReportRes.status === 413 && oversizedReportData.error.includes('4 MB'), "Oversized report uploads receive a clear 4 MB limit error");
+
   const reportForm = new FormData();
   reportForm.append('categoryId', 'residential-issues');
   reportForm.append('urgencyLevel', 'CRITICAL');

@@ -13,9 +13,10 @@ import { sendStoredFile, storeUpload } from "../../lib/file-storage.js";
 
 const router = Router();
 const reportUploadDirectory = path.resolve(process.cwd(), "private-uploads", "reports");
+const maxReportMediaBytes = 4 * 1024 * 1024;
 const reportUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 },
+  limits: { fileSize: maxReportMediaBytes, files: 5 },
   fileFilter: (_request, file, callback) => callback(null, file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")),
 });
 const categoryNames: Record<string, string> = {
@@ -115,6 +116,10 @@ router.post("/", requireAuth, reportUpload.array("media", 5), async (request: Au
     const urgencyLevel = input.urgencyLevel
       ?? (allowedUrgencyLevels.includes(category.urgencyLevel) ? category.urgencyLevel : "MEDIUM");
     const files = (request.files as Express.Multer.File[] | undefined) || [];
+    if (files.reduce((total, file) => total + file.size, 0) > maxReportMediaBytes) {
+      response.status(413).json({ error: "Report photos and videos must total no more than 4 MB." });
+      return;
+    }
     const imageFiles = files.filter((file) => file.mimetype.startsWith("image/"));
     const geofenceSetting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
     const enforceReportGeofence = geofenceSetting?.value ?? true;
