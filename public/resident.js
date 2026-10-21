@@ -358,7 +358,10 @@ async function fetchResidentProfile() {
     document.querySelector('#report-count').textContent = resident.reports?.length || 0;
 
     const rows = resident.reports?.length ? resident.reports.map((report) => {
-      const residentComments = (report.actions || []).map((action) => `<div class="resident-status-comment"><strong>Barangay update</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`).join('');
+      const residentComments = (report.actions || []).map((action) => {
+        const label = action.actionStatus === 'PROGRESS_UPDATE' ? 'Progress update' : 'Barangay update';
+        return `<div class="resident-status-comment"><strong>${label}</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
+      }).join('');
       const resolutionDate = report.resolvedAt ? `<small class="resolved-date">Resolved ${new Date(report.resolvedAt).toLocaleString('en-PH')}</small>` : '';
       const resolutionDetails = report.resolutionDetails ? `<div class="resident-resolution-result"><strong>Resolution results</strong><p>${escapeHtml(report.resolutionDetails)}</p></div>` : '';
       const hasResolutionProof = report.media?.some((item) => item.isResolutionProof);

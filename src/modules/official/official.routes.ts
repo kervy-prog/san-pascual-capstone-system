@@ -36,6 +36,7 @@ const reportStatusSchema = z.object({
 });
 const reportFeedbackSchema = z.object({ notes: z.string().trim().min(5).max(1000) });
 const residentCommentSchema = z.object({ comment: z.string().trim().min(5).max(1000) });
+const progressUpdateSchema = z.object({ update: z.string().trim().min(5).max(1000) });
 
 router.get("/overview", async (request: AuthRequest, response, next) => {
   try {
@@ -170,6 +171,46 @@ router.post("/reports/:id/resident-comment", async (request: AuthRequest, respon
       select: { id: true, actionRemarks: true, actionDate: true },
     });
     response.status(201).json(savedComment);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/reports/:id/progress", async (request: AuthRequest, response, next) => {
+  try {
+    const { update } = progressUpdateSchema.parse(request.body);
+    const official = await prisma.barangayOfficial.findFirst({
+      where: { residentId: request.userId },
+      select: { id: true },
+    });
+    if (!official) {
+      response.status(404).json({ error: "Official profile not found" });
+      return;
+    }
+
+    const report = await prisma.infrastructureReport.findFirst({
+      where: { id: String(request.params.id), assignedOfficialId: official.id },
+      select: { id: true, status: true },
+    });
+    if (!report) {
+      response.status(404).json({ error: "This report is not assigned to you" });
+      return;
+    }
+    if (!["UNDER_REVIEW", "IN_PROGRESS"].includes(report.status)) {
+      response.status(409).json({ error: "Progress updates can be added while the report is under review or in progress" });
+      return;
+    }
+
+    const savedUpdate = await prisma.barangayAction.create({
+      data: {
+        officialId: official.id,
+        reportId: report.id,
+        actionStatus: "PROGRESS_UPDATE",
+        actionRemarks: update,
+      },
+      select: { id: true, actionRemarks: true, actionDate: true },
+    });
+    response.status(201).json(savedUpdate);
   } catch (error) {
     next(error);
   }

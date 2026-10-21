@@ -318,6 +318,17 @@ async function run() {
   });
   await assert(offInProgressRes.status === 200, "Official updates report to IN_PROGRESS");
 
+  const progressUpdateRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${officialToken}` },
+    body: JSON.stringify({ update: 'Our team inspected the area today and clearing work has started.' }),
+  });
+  const progressUpdate = await progressUpdateRes.json();
+  await assert(progressUpdateRes.status === 201, "Official posts a status update on the ongoing report");
+  const residentProgressMe = await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${residentToken}` } })).json();
+  const residentProgressAction = residentProgressMe.user.reports.find((report) => report.id === reportId)?.actions?.find((action) => action.actionStatus === 'PROGRESS_UPDATE');
+  await assert(residentProgressAction?.actionRemarks === progressUpdate.actionRemarks, "Resident can see the official's progress update while the report is ongoing");
+
   const fieldFeedbackRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${officialToken}` },
@@ -370,7 +381,7 @@ async function run() {
   const residentComment = await residentCommentRes.json();
   await assert(residentCommentRes.status === 201, "Official adds a comment for the resident after resolution");
   const residentReportAfterComment = await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${residentToken}` } })).json();
-  const residentVisibleComment = residentReportAfterComment.user.reports.find((report) => report.id === reportId)?.actions?.[0];
+  const residentVisibleComment = residentReportAfterComment.user.reports.find((report) => report.id === reportId)?.actions?.find((action) => action.actionStatus === 'RESIDENT_COMMENT');
   await assert(residentVisibleComment?.actionRemarks === residentComment.actionRemarks, "Resident can see the official's final report comment");
 
   // Verify Admin dashboard progress metrics

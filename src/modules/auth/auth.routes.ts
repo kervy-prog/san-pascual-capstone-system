@@ -195,9 +195,9 @@ router.get("/me", requireAuth, async (request: AuthRequest, response, next) => {
             category: true,
             media: true,
             actions: {
-              where: { actionStatus: "RESIDENT_COMMENT" },
+              where: { actionStatus: { in: ["RESIDENT_COMMENT", "PROGRESS_UPDATE"] } },
               orderBy: { actionDate: "asc" },
-              select: { id: true, actionRemarks: true, actionDate: true },
+              select: { id: true, actionStatus: true, actionRemarks: true, actionDate: true },
             },
           },
         },
