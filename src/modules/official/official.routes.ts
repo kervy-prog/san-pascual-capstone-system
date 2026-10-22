@@ -176,7 +176,7 @@ router.post("/reports/:id/resident-comment", async (request: AuthRequest, respon
   }
 });
 
-router.post("/reports/:id/progress", async (request: AuthRequest, response, next) => {
+router.post("/reports/:id/progress", resolutionProofUpload.single("progressImage"), async (request: AuthRequest, response, next) => {
   try {
     const { update } = progressUpdateSchema.parse(request.body);
     const official = await prisma.barangayOfficial.findFirst({
@@ -201,14 +201,29 @@ router.post("/reports/:id/progress", async (request: AuthRequest, response, next
       return;
     }
 
+    let imageFilePath: string | undefined;
+    if (request.file) {
+      const extension = path.extname(request.file.originalname).toLowerCase() || ".jpg";
+      const fileName = `${report.id}-progress-${crypto.randomUUID()}${extension}`;
+      await storeUpload({
+        localDirectory: path.resolve(process.cwd(), "private-uploads", "reports"),
+        storagePath: `reports/${fileName}`,
+        fileName,
+        buffer: request.file.buffer,
+        contentType: request.file.mimetype,
+      });
+      imageFilePath = `/private-uploads/reports/${fileName}`;
+    }
+
     const savedUpdate = await prisma.barangayAction.create({
       data: {
         officialId: official.id,
         reportId: report.id,
         actionStatus: "PROGRESS_UPDATE",
         actionRemarks: update,
+        imageFilePath,
       },
-      select: { id: true, actionRemarks: true, actionDate: true },
+      select: { id: true, actionRemarks: true, actionDate: true, imageFilePath: true },
     });
     response.status(201).json(savedUpdate);
   } catch (error) {

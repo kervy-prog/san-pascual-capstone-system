@@ -318,16 +318,27 @@ async function run() {
   });
   await assert(offInProgressRes.status === 200, "Official updates report to IN_PROGRESS");
 
+  const progressForm = new FormData();
+  progressForm.append('update', 'Our team inspected the area today and clearing work has started.');
+  const progressImage = await sharp(crypto.randomBytes(256 * 256 * 3), { raw: { width: 256, height: 256, channels: 3 } }).jpeg({ quality: 90 }).toBuffer();
+  progressForm.append('progressImage', new Blob([progressImage], { type: 'image/jpeg' }), 'on_site_progress.jpg');
   const progressUpdateRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/progress`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${officialToken}` },
-    body: JSON.stringify({ update: 'Our team inspected the area today and clearing work has started.' }),
+    headers: { Authorization: `Bearer ${officialToken}` },
+    body: progressForm,
   });
   const progressUpdate = await progressUpdateRes.json();
   await assert(progressUpdateRes.status === 201, "Official posts a status update on the ongoing report");
+  await assert(Boolean(progressUpdate.imageFilePath), "Progress update stores the uploaded on-site photo");
   const residentProgressMe = await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${residentToken}` } })).json();
   const residentProgressAction = residentProgressMe.user.reports.find((report) => report.id === reportId)?.actions?.find((action) => action.actionStatus === 'PROGRESS_UPDATE');
   await assert(residentProgressAction?.actionRemarks === progressUpdate.actionRemarks, "Resident can see the official's progress update while the report is ongoing");
+  await assert(residentProgressAction?.imageFilePath === progressUpdate.imageFilePath, "Resident's progress update includes the on-site photo reference");
+  const progressImageRes = await fetch(`${BASE_URL}/api/requests/${reportId}/actions/${progressUpdate.id}/image`, {
+    headers: { Authorization: `Bearer ${residentToken}` },
+  });
+  const progressImageBytes = await progressImageRes.arrayBuffer();
+  await assert(progressImageRes.status === 200 && progressImageBytes.byteLength > 0, "Resident can load the on-site progress photo");
 
   const fieldFeedbackRes = await fetch(`${BASE_URL}/api/official/reports/${reportId}/feedback`, {
     method: 'POST',

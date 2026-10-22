@@ -52,6 +52,24 @@ function closeResolutionProof() {
 
 document.querySelector('#close-resolution-proof').addEventListener('click', closeResolutionProof);
 
+async function viewProgressPhoto(reportId, actionId) {
+  closeResolutionProof();
+  resolutionProofModal.classList.remove('hidden');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/requests/${encodeURIComponent(reportId)}/actions/${encodeURIComponent(actionId)}/image`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Unable to load the on-site photo.');
+    }
+    resolutionProofUrl = URL.createObjectURL(await response.blob());
+    resolutionProofImage.src = resolutionProofUrl;
+  } catch (error) {
+    resolutionProofError.textContent = error.message;
+  }
+}
+
 async function viewResolutionProof(reportId) {
   closeResolutionProof();
   resolutionProofModal.classList.remove('hidden');
@@ -360,7 +378,8 @@ async function fetchResidentProfile() {
     const rows = resident.reports?.length ? resident.reports.map((report) => {
       const residentComments = (report.actions || []).map((action) => {
         const label = action.actionStatus === 'PROGRESS_UPDATE' ? 'Progress update' : 'Barangay update';
-        return `<div class="resident-status-comment"><strong>${label}</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
+        const onSitePhoto = action.imageFilePath ? `<button type="button" class="progress-photo-button" data-progress-report-id="${report.id}" data-progress-action-id="${action.id}">View on-site photo</button>` : '';
+        return `<div class="resident-status-comment"><strong>${label}</strong><p>${escapeHtml(action.actionRemarks)}</p>${onSitePhoto}<small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
       }).join('');
       const resolutionDate = report.resolvedAt ? `<small class="resolved-date">Resolved ${new Date(report.resolvedAt).toLocaleString('en-PH')}</small>` : '';
       const resolutionDetails = report.resolutionDetails ? `<div class="resident-resolution-result"><strong>Resolution results</strong><p>${escapeHtml(report.resolutionDetails)}</p></div>` : '';
@@ -379,6 +398,9 @@ async function fetchResidentProfile() {
     document.querySelector('#resident-report-list').innerHTML = rows;
     document.querySelectorAll('.resolution-proof-button').forEach((button) => {
       button.addEventListener('click', () => viewResolutionProof(button.dataset.resolutionReportId));
+    });
+    document.querySelectorAll('.progress-photo-button').forEach((button) => {
+      button.addEventListener('click', () => viewProgressPhoto(button.dataset.progressReportId, button.dataset.progressActionId));
     });
   } catch (error) {
     message.textContent = error.message;

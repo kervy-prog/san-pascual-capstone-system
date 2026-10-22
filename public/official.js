@@ -132,7 +132,7 @@ function hazardCard(report) {
     ? `<div class="progress-update-list"><h4>Status updates for the resident</h4>${progressUpdates.map((action) => `<p>${escapeHtml(action.actionRemarks)}<small>${formatDate(action.actionDate, true)}</small></p>`).join('')}</div>`
     : '';
   const progressUpdateForm = ['UNDER_REVIEW', 'IN_PROGRESS'].includes(currentStatus)
-    ? `<form class="progress-update-form" data-progress-report-id="${report.id}"><label for="progress-update-${report.id}">Status update for the resident</label><textarea id="progress-update-${report.id}" name="update" rows="2" minlength="5" maxlength="1000" placeholder="Example: Our team inspected the area today and clearing work has started." required></textarea><button type="submit" class="progress-update-button">Post status update</button></form>`
+    ? `<form class="progress-update-form" data-progress-report-id="${report.id}"><label for="progress-update-${report.id}">Status update for the resident</label><textarea id="progress-update-${report.id}" name="update" rows="2" minlength="5" maxlength="1000" placeholder="Example: Our team inspected the area today and clearing work has started." required></textarea><label for="progress-image-${report.id}">On-site photo <span>(optional, JPG, PNG, or WebP; up to 5 MB)</span></label><input id="progress-image-${report.id}" name="progressImage" type="file" accept="image/jpeg,image/png,image/webp" /><button type="submit" class="progress-update-button">Post status update</button></form>`
     : '';
   const resolutionForm = currentStatus === 'IN_PROGRESS'
     ? `<form class="resolution-form" data-resolution-report-id="${report.id}"><label for="resolution-details-${report.id}">Resolution results <span>(optional)</span></label><textarea id="resolution-details-${report.id}" name="resolutionDetails" rows="3" maxlength="2000" placeholder="Describe the work completed and its result."></textarea><label for="resolution-proof-${report.id}">Photo proof <span>(optional, JPG, PNG, or WebP; up to 5 MB)</span></label><input id="resolution-proof-${report.id}" name="resolutionProof" type="file" accept="image/jpeg,image/png,image/webp" /><button type="submit" class="resolution-button">Mark as resolved</button></form>`
@@ -209,12 +209,17 @@ async function submitFieldFeedback(reportId, notes) {
   }
 }
 
-async function submitProgressUpdate(reportId, update) {
+async function submitProgressUpdate(reportId, form) {
+  const update = form.elements.update.value.trim();
+  const progressImage = form.elements.progressImage.files[0];
+  const payload = new FormData();
+  payload.append('update', update);
+  if (progressImage) payload.append('progressImage', progressImage);
   try {
     const response = await fetch(`${API_BASE_URL}/api/official/reports/${reportId}/progress`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ update }),
+      headers: { Authorization: `Bearer ${token}` },
+      body: payload,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to post status update');
@@ -294,8 +299,7 @@ async function loadDashboard() {
     document.querySelectorAll('.progress-update-form').forEach((form) => {
       form.addEventListener('submit', (event) => {
         event.preventDefault();
-        const update = form.elements.update.value.trim();
-        if (update.length >= 5) submitProgressUpdate(form.dataset.progressReportId, update);
+        if (form.elements.update.value.trim().length >= 5) submitProgressUpdate(form.dataset.progressReportId, form);
       });
     });
   } catch (error) {

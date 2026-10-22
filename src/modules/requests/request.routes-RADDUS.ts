@@ -110,6 +110,37 @@ router.get("/:id/resolution-proof", requireAuth, async (request: AuthRequest, re
   }
 });
 
+router.get("/:id/actions/:actionId/image", requireAuth, async (request: AuthRequest, response, next) => {
+  try {
+    if (request.userRole !== "RESIDENT") {
+      response.status(403).json({ error: "Resident access required" });
+      return;
+    }
+    const action = await prisma.barangayAction.findFirst({
+      where: {
+        id: String(request.params.actionId),
+        actionStatus: "PROGRESS_UPDATE",
+        imageFilePath: { not: null },
+        report: { id: String(request.params.id), residentId: request.userId },
+      },
+      select: { imageFilePath: true },
+    });
+    if (!action?.imageFilePath) {
+      response.status(404).json({ error: "No on-site photo is available for this update" });
+      return;
+    }
+    const fileName = path.basename(action.imageFilePath);
+    const found = await sendStoredFile(response, {
+      localDirectory: reportUploadDirectory,
+      storagePath: `reports/${fileName}`,
+      fileName,
+    });
+    if (!found && !response.headersSent) response.status(404).json({ error: "On-site photo not found" });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/uploads/sign", requireAuth, async (request: AuthRequest, response, next) => {
   try {
     if (!request.userId) {

@@ -197,7 +197,7 @@ router.get("/me", requireAuth, async (request: AuthRequest, response, next) => {
             actions: {
               where: { actionStatus: { in: ["RESIDENT_COMMENT", "PROGRESS_UPDATE"] } },
               orderBy: { actionDate: "asc" },
-              select: { id: true, actionStatus: true, actionRemarks: true, actionDate: true },
+              select: { id: true, actionStatus: true, actionRemarks: true, actionDate: true, imageFilePath: true },
             },
           },
         },

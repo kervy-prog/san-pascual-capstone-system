@@ -194,6 +194,7 @@ model BarangayAction {
   officialId   String
   actionStatus String
   actionRemarks String
+  imageFilePath String?
   actionDate   DateTime             @default(now())
   report       InfrastructureReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   official     BarangayOfficial     @relation(fields: [officialId], references: [id])
