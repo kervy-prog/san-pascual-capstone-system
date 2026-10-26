@@ -410,6 +410,29 @@ async function fetchResidentProfile() {
 }
 
 fetchResidentProfile();
-setInterval(() => {
-  if (!document.hidden) fetchResidentProfile();
-}, 30000);
+
+// Reload the report list only when one of the resident's reports has new activity.
+let activityVersion = null;
+let activityCheckInFlight = false;
+async function checkForReportActivity() {
+  if (activityCheckInFlight || document.hidden) return;
+  activityCheckInFlight = true;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me/activity`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    if (!response.ok) return;
+    const { version } = await response.json();
+    const changed = activityVersion !== null && version !== activityVersion;
+    activityVersion = version;
+    if (changed) await fetchResidentProfile();
+  } catch {
+    // Network hiccups are retried on the next check.
+  } finally {
+    activityCheckInFlight = false;
+  }
+}
+
+checkForReportActivity();
+setInterval(checkForReportActivity, 10000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkForReportActivity();
+});

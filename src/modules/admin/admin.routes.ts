@@ -7,6 +7,7 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAdmin } from "../../middleware/require-admin.js";
 import { sendStoredFile } from "../../lib/file-storage.js";
 import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
+import { getAdminActivityVersion } from "../../lib/report-activity.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -45,6 +46,15 @@ router.patch("/settings/report-geofence", async (request, response, next) => {
       update: { value: enforceReportGeofence },
     });
     response.json({ enforceReportGeofence: setting.value });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/activity", async (_request, response, next) => {
+  try {
+    response.setHeader("Cache-Control", "no-store");
+    response.json({ version: await getAdminActivityVersion() });
   } catch (error) {
     next(error);
   }

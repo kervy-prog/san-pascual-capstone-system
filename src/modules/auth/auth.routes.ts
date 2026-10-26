@@ -9,6 +9,7 @@ import { z } from "zod";
 import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { storeUpload } from "../../lib/file-storage.js";
+import { getReportActivityVersion } from "../../lib/report-activity.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
 
 const router = Router();
@@ -179,6 +180,15 @@ router.post("/login", async (request, response, next) => {
       token: createToken(user.id, user.role),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, isVerified: user.isVerified, approvalStatus: user.approvalStatus },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/me/activity", requireAuth, async (request: AuthRequest, response, next) => {
+  try {
+    response.setHeader("Cache-Control", "no-store");
+    response.json({ version: await getReportActivityVersion({ residentId: request.userId! }) });
   } catch (error) {
     next(error);
   }

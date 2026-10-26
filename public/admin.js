@@ -516,9 +516,39 @@ async function refreshReports() {
 }
 
 loadDashboard();
-setInterval(() => {
-  if (!document.hidden) refreshReports();
-}, 30000);
+
+function isEditingAdminField() {
+  const active = document.activeElement;
+  return Boolean(active?.matches('input, textarea, select'));
+}
+
+// Reload only when report or account activity changes, and wait while an admin is editing a field.
+let activityVersion = null;
+let activityChangePending = false;
+let activityCheckInFlight = false;
+async function checkForAdminActivity() {
+  if (activityCheckInFlight || document.hidden) return;
+  activityCheckInFlight = true;
+  try {
+    const { version } = await request('/activity');
+    if (activityVersion !== null && version !== activityVersion) activityChangePending = true;
+    activityVersion = version;
+    if (activityChangePending && !isEditingAdminField()) {
+      activityChangePending = false;
+      await loadDashboard();
+    }
+  } catch {
+    // Network hiccups are retried on the next check.
+  } finally {
+    activityCheckInFlight = false;
+  }
+}
+
+checkForAdminActivity();
+setInterval(checkForAdminActivity, 10000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkForAdminActivity();
+});
 function labelAdminReportTableCells() {
   document.querySelectorAll(".report-table-wrap table").forEach((table) => {
     const headers = Array.from(table.querySelectorAll("thead th")).map((header) =>

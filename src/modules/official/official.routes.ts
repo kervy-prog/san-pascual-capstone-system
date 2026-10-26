@@ -10,6 +10,7 @@ import { sendResidentProgressSms } from "../../lib/semaphore.js";
 import { sendStoredFile } from "../../lib/file-storage.js";
 import { storeUpload } from "../../lib/file-storage.js";
 import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
+import { getReportActivityVersion } from "../../lib/report-activity.js";
 
 const router = Router();
 const resolutionProofUpload = multer({
@@ -37,6 +38,15 @@ const reportStatusSchema = z.object({
 const reportFeedbackSchema = z.object({ notes: z.string().trim().min(5).max(1000) });
 const residentCommentSchema = z.object({ comment: z.string().trim().min(5).max(1000) });
 const progressUpdateSchema = z.object({ update: z.string().trim().min(5).max(1000) });
+
+router.get("/activity", async (request: AuthRequest, response, next) => {
+  try {
+    response.setHeader("Cache-Control", "no-store");
+    response.json({ version: await getReportActivityVersion({ assignedOfficial: { residentId: request.userId } }) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/overview", async (request: AuthRequest, response, next) => {
   try {

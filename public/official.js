@@ -309,3 +309,39 @@ async function loadDashboard() {
 }
 
 loadDashboard();
+
+function isEditingHazardForm() {
+  const active = document.activeElement;
+  if (active?.closest('#hazard-list form')) return true;
+  return Array.from(document.querySelectorAll('#hazard-list textarea, #hazard-list input[type="file"]')).some((field) => field.value);
+}
+
+// Reload only when report activity changes, and wait while an official is filling in a form.
+let activityVersion = null;
+let activityChangePending = false;
+let activityCheckInFlight = false;
+async function checkForReportActivity() {
+  if (activityCheckInFlight || document.hidden) return;
+  activityCheckInFlight = true;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/official/activity`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    if (!response.ok) return;
+    const { version } = await response.json();
+    if (activityVersion !== null && version !== activityVersion) activityChangePending = true;
+    activityVersion = version;
+    if (activityChangePending && !isEditingHazardForm()) {
+      activityChangePending = false;
+      await loadDashboard();
+    }
+  } catch {
+    // Network hiccups are retried on the next check.
+  } finally {
+    activityCheckInFlight = false;
+  }
+}
+
+checkForReportActivity();
+setInterval(checkForReportActivity, 10000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkForReportActivity();
+});
