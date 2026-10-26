@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler } from "express";
 import multer from "multer";
 import { ZodError } from "zod";
+import { isDatabaseConnectionError } from "../lib/prisma.js";
 
 export const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   if (error instanceof ZodError) {
@@ -18,6 +19,13 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
         ? "Each report media file must be 4 MB or smaller, with no more than 4 MB total."
         : "Report upload is invalid or exceeds the 5-file limit.",
     });
+    return;
+  }
+
+  if (isDatabaseConnectionError(error)) {
+    console.error(error);
+    response.setHeader("Retry-After", "3");
+    response.status(503).json({ error: "The system is busy right now. Please try again in a moment." });
     return;
   }
 

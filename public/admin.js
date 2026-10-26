@@ -354,9 +354,9 @@ function renderResolvedReports(reports) {
     : '<tr><td colspan="6" class="empty-state">No reports resolved yet.</td></tr>';
 }
 
-async function loadReports() {
+async function loadReports(prefetchedReports) {
   try {
-    const allReports = await request('/reports');
+    const allReports = prefetchedReports ?? await request('/reports');
     renderResolvedReports(allReports);
     const reports = allReports
       .filter((report) => report.status !== 'SUBMITTED' && report.status !== 'RESOLVED')
@@ -418,9 +418,9 @@ function reportApprovalCard(report) {
   return `<article class="approval-card report-approval-card"><div class="account-avatar">!</div><div class="account-details"><div class="account-title"><h3>${report.ticketNumber}</h3><span class="pending-badge">Needs review</span></div><p>${residentName} · ${report.category.name} · ${reportUrgencyLevel(report)}</p><p>${report.exactLocationLandmark}</p><p>${locationAction}</p><p>${report.descriptionOfHazard}</p><p><strong>Assign official</strong> ${assignmentControl(report)}</p><small>Submitted ${new Date(report.dateSubmitted).toLocaleString('en-PH')}</small></div><div class="approval-actions">${mediaAction}<button class="approve-button" data-report-status="UNDER_REVIEW" data-report-id="${report.id}">Approve</button><button class="reject-button" data-report-status="REJECTED" data-report-id="${report.id}">Reject</button></div></article>`;
 }
 
-async function loadReportApprovals() {
+async function loadReportApprovals(prefetchedReports) {
   try {
-    const reports = await request('/reports');
+    const reports = prefetchedReports ?? await request('/reports');
     const pendingReports = reports.filter((report) => report.status === 'SUBMITTED').sort(compareReportUrgency);
     document.querySelector('#nav-report-pending').textContent = pendingReports.length;
     document.querySelector('#report-approval-count').textContent = pendingReports.length;
@@ -454,8 +454,7 @@ async function loadDashboard() {
     document.querySelectorAll('[data-status]').forEach((button) => button.addEventListener('click', () => updateApproval(button.dataset.id, button.dataset.status)));
     await loadApprovedResidents();
     await loadApprovedOfficials();
-    await loadReportApprovals();
-    await loadReports();
+    await refreshReports();
   } catch (error) {
     message.textContent = error.message;
     message.classList.add('error');
@@ -500,11 +499,26 @@ async function updateApproval(id, status) {
   }
 }
 
+let reportRefreshInFlight = false;
+async function refreshReports() {
+  if (reportRefreshInFlight) return;
+  reportRefreshInFlight = true;
+  try {
+    const reports = await request('/reports');
+    await loadReportApprovals(reports);
+    await loadReports(reports);
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+  } finally {
+    reportRefreshInFlight = false;
+  }
+}
+
 loadDashboard();
 setInterval(() => {
-  loadReportApprovals();
-  loadReports();
-}, 10000);
+  if (!document.hidden) refreshReports();
+}, 30000);
 function labelAdminReportTableCells() {
   document.querySelectorAll(".report-table-wrap table").forEach((table) => {
     const headers = Array.from(table.querySelectorAll("thead th")).map((header) =>

@@ -410,4 +410,6 @@ async function fetchResidentProfile() {
 }
 
 fetchResidentProfile();
-setInterval(fetchResidentProfile, 10000);
+setInterval(() => {
+  if (!document.hidden) fetchResidentProfile();
+}, 30000);
