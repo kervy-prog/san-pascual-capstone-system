@@ -7,7 +7,7 @@ const READ_OPERATIONS = new Set([
 ]);
 // Errors raised before the query reaches the database, so any operation can be retried safely.
 const CONNECTION_ACQUIRE_CODES = new Set(["P1001", "P1002", "P2024"]);
-const CONNECTION_ACQUIRE_MESSAGE = /max client connections|too many (clients|connections)|remaining connection slots|can't reach database server|timed out fetching a new connection/i;
+const CONNECTION_ACQUIRE_MESSAGE = /max client connections|max clients reached|EMAXCONN|too many (clients|connections)|remaining connection slots|can't reach database server|timed out fetching a new connection/i;
 // Errors that may happen mid-query, so only reads are retried.
 const CONNECTION_LOST_CODES = new Set(["P1008", "P1017"]);
 const CONNECTION_LOST_MESSAGE = /server has closed the connection|connection (reset|terminated|closed)|ECONNRESET/i;
@@ -33,11 +33,15 @@ function isRetryable(error: unknown, operation: string) {
 
 // Serverless instances each open their own pool, so keep it to one connection per instance
 // to avoid exhausting the database's connection limit under concurrent requests.
+// Supabase's session pooler (port 5432) caps clients at its small pool size, so runtime
+// queries use the transaction pooler (port 6543) on the same host instead. Migrations still
+// run through the original DATABASE_URL via the Prisma CLI.
 function serverlessDatabaseUrl() {
   const rawUrl = process.env.DATABASE_URL;
   if (!rawUrl || !process.env.VERCEL) return undefined;
   try {
     const url = new URL(rawUrl);
+    if (url.hostname.endsWith(".pooler.supabase.com") && url.port === "5432") url.port = "6543";
     if (!url.searchParams.has("connection_limit")) url.searchParams.set("connection_limit", "1");
     if (!url.searchParams.has("pool_timeout")) url.searchParams.set("pool_timeout", "20");
     if (url.port === "6543" && !url.searchParams.has("pgbouncer")) url.searchParams.set("pgbouncer", "true");
