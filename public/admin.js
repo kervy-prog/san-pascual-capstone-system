@@ -370,7 +370,7 @@ async function loadReports() {
           const officialName = action.official?.resident ? `${action.official.resident.firstName} ${action.official.resident.lastName}` : 'Barangay official';
           return `<div class="field-feedback-note"><strong>${escapeHtml(officialName)} · On-site feedback</strong><p>${escapeHtml(action.actionRemarks)}</p><small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
         }).join('');
-        return `<tr><td><strong>${report.reportId || report.ticketNumber}</strong></td><td>${report.ticketNumber}</td><td>${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td>${reportUrgencyLevel(report)}</td><td>${report.exactLocationLandmark}</td><td>${report.descriptionOfHazard}${feedbackHtml}</td><td>${assignmentControl(report)}</td><td>${statusControl(report)}</td><td>${mediaAction}</td><td>${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
+        return `<tr><td data-label="Report ID"><strong>${report.reportId || report.ticketNumber}</strong></td><td data-label="Ticket">${report.ticketNumber}</td><td data-label="Resident">${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td data-label="Category">${report.category.name}</td><td data-label="Urgency">${reportUrgencyLevel(report)}</td><td data-label="Exact location">${report.exactLocationLandmark}</td><td data-label="Description">${report.descriptionOfHazard}${feedbackHtml}</td><td data-label="Assigned official">${assignmentControl(report)}</td><td data-label="Status">${statusControl(report)}</td><td data-label="Media">${mediaAction}</td><td data-label="Submitted">${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
       }).join('')
       : '<tr><td colspan="11" class="empty-state">No reports submitted yet.</td></tr>';
     document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath, button.dataset)));
@@ -505,3 +505,33 @@ setInterval(() => {
   loadReportApprovals();
   loadReports();
 }, 10000);
+function labelAdminReportTableCells() {
+  document.querySelectorAll(".report-table-wrap table").forEach((table) => {
+    const headers = Array.from(table.querySelectorAll("thead th")).map((header) =>
+      header.textContent.trim()
+    );
+
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      Array.from(row.cells).forEach((cell, index) => {
+        if (!cell.hasAttribute("data-label") && cell.colSpan === 1 && headers[index]) {
+          cell.dataset.label = headers[index];
+        }
+      });
+    });
+  });
+}
+
+const adminReportTableObserver = new MutationObserver(labelAdminReportTableCells);
+if (document.body) {
+  labelAdminReportTableCells();
+  adminReportTableObserver.observe(document.body, { childList: true, subtree: true });
+} else {
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+      labelAdminReportTableCells();
+      adminReportTableObserver.observe(document.body, { childList: true, subtree: true });
+    },
+    { once: true }
+  );
+}

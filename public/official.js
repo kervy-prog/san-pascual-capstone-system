@@ -90,7 +90,7 @@ function reportRow(report) {
   const resident = report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`;
   const reportIdSub = report.reportId && report.reportId !== report.ticketNumber ? `<small>${report.reportId}</small>` : '';
   const urgencyLevel = report.urgencyLevel || report.category.urgencyLevel;
-  return `<tr><td><strong>${report.ticketNumber}</strong>${reportIdSub}</td><td>${resident}<small>${report.resident.email}</small></td><td>${report.category.name}</td><td><span class="urgency urgency-${urgencyLevel.toLowerCase()}">${urgencyLevel}</span></td><td><span class="status-pill">${(report.currentStatus || report.status).replaceAll('_', ' ')}</span></td><td>${formatDate(report.dateSubmitted, true)}</td></tr>`;
+  return `<tr><td data-label="Ticket"><strong>${report.ticketNumber}</strong>${reportIdSub}</td><td data-label="Resident">${resident}<small>${report.resident.email}</small></td><td data-label="Category">${report.category.name}</td><td data-label="Urgency"><span class="urgency urgency-${urgencyLevel.toLowerCase()}">${urgencyLevel}</span></td><td data-label="Status"><span class="status-pill">${(report.currentStatus || report.status).replaceAll('_', ' ')}</span></td><td data-label="Submitted">${formatDate(report.dateSubmitted, true)}</td></tr>`;
 }
 
 function hazardCard(report) {

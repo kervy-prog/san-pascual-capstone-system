@@ -381,17 +381,18 @@ async function fetchResidentProfile() {
         const onSitePhoto = action.imageFilePath ? `<button type="button" class="progress-photo-button" data-progress-report-id="${report.id}" data-progress-action-id="${action.id}">View on-site photo</button>` : '';
         return `<div class="resident-status-comment"><strong>${label}</strong><p>${escapeHtml(action.actionRemarks)}</p>${onSitePhoto}<small>${new Date(action.actionDate).toLocaleString('en-PH')}</small></div>`;
       }).join('');
+      const status = report.status || report.currentStatus || 'SUBMITTED';
       const resolutionDate = report.resolvedAt ? `<small class="resolved-date">Resolved ${new Date(report.resolvedAt).toLocaleString('en-PH')}</small>` : '';
       const resolutionDetails = report.resolutionDetails ? `<div class="resident-resolution-result"><strong>Resolution results</strong><p>${escapeHtml(report.resolutionDetails)}</p></div>` : '';
       const hasResolutionProof = report.media?.some((item) => item.isResolutionProof);
       const resolutionProof = hasResolutionProof ? `<button type="button" class="resolution-proof-button" data-resolution-report-id="${report.id}">View photo proof</button>` : '';
       return `
-      <tr>
-        <td>${report.ticketNumber || report.id}</td>
-        <td>${report.category?.name || 'N/A'}</td>
-        <td>${report.exactLocationLandmark || 'N/A'}</td>
-        <td><strong>${report.status || report.currentStatus || 'SUBMITTED'}</strong>${resolutionDate}${resolutionDetails}${resolutionProof}${residentComments}</td>
-        <td>${new Date(report.dateSubmitted || report.createdAt).toLocaleDateString('en-PH')}</td>
+      <tr class="status-${status.toLowerCase()}">
+        <td data-label="Ticket" class="card-ticket"><strong>${report.ticketNumber || report.id}</strong></td>
+        <td data-label="Category">${report.category?.name || 'N/A'}</td>
+        <td data-label="Location">${report.exactLocationLandmark || 'N/A'}</td>
+        <td data-label="Status"><span class="status-pill status-pill-${status.toLowerCase()}">${status.replaceAll('_', ' ')}</span>${resolutionDate}${resolutionDetails}${resolutionProof}${residentComments}</td>
+        <td data-label="Date">${new Date(report.dateSubmitted || report.createdAt).toLocaleDateString('en-PH')}</td>
       </tr>
     `;
     }).join('') : '<tr><td colspan="5" class="empty-state">No reports submitted yet.</td></tr>';
