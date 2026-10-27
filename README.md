@@ -62,6 +62,10 @@ Backend foundation for the infrastructure complaint and service request manageme
 
 Open `http://<computer-ip>:5500`. The API health checks are available through the same frontend host at `/health` and `/health/db`.
 
+Resident and barangay official login requires both `approvalStatus: APPROVED` and
+`isVerified: true`. Admin approval sets both fields; pending, rejected, or unverified
+accounts cannot receive a login token.
+
 ### Larger report media on Vercel
 
 Vercel serverless requests have a roughly 4.5 MB body limit. Larger report photos and videos therefore upload directly to a private Supabase Storage bucket using short-lived signed URLs. Configure these Vercel environment variables:

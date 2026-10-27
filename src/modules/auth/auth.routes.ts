@@ -176,6 +176,11 @@ router.post("/login", async (request, response, next) => {
       return;
     }
 
+    if (user.role !== "ADMIN" && !user.isVerified) {
+      response.status(403).json({ error: "Your account must be verified by the barangay before you can log in" });
+      return;
+    }
+
     response.json({
       token: createToken(user.id, user.role),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, isVerified: user.isVerified, approvalStatus: user.approvalStatus },
