@@ -87,6 +87,9 @@ Set the private bucket's per-object limit to at least 10 MB and allow JPEG, PNG,
 In the official dashboard, resolved reports remain in Reports but are excluded from
 Designated hazards. Resolving a report refreshes the work queue without deleting its record.
 
+The admin resident and barangay official directories are sorted by last name (A-Z),
+then first and middle name for matching surnames.
+
 For phone or another laptop access on the same Wi-Fi, open `http://<computer-ip>:5500`. Set `FRONTEND_HOST=0.0.0.0` to listen on all network interfaces, or set it to a specific host/IP for a fixed deployment.
 
 ### Workflow

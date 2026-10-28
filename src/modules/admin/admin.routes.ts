@@ -117,7 +117,12 @@ router.get("/residents", async (_request, response, next) => {
         updatedAt: true,
         approvalStatus: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { lastName: "asc" },
+        { firstName: "asc" },
+        { middleName: "asc" },
+        { id: "asc" },
+      ],
     });
     response.json(residents);
   } catch (error) {
@@ -147,7 +152,12 @@ router.get("/officials", async (_request, response, next) => {
           },
         },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [
+        { resident: { lastName: "asc" } },
+        { resident: { firstName: "asc" } },
+        { resident: { middleName: "asc" } },
+        { id: "asc" },
+      ],
     });
     response.json(officials);
   } catch (error) {
