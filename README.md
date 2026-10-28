@@ -93,6 +93,9 @@ then first and middle name for matching surnames.
 The sign-in page and dashboards display the barangay seal. All dashboards use a
 horizontal header with wrapping module links and Sign out at the top right on
 screens up to 800px wide. Wider screens retain the left navigation sidebar.
+Mobile headers use the top half of the supplied barangay hall photo with a dark
+overlay for readability. Module links appear in a fully visible, wrapping tile
+grid rather than a horizontally scrolling strip.
 
 For phone or another laptop access on the same Wi-Fi, open `http://<computer-ip>:5500`. Set `FRONTEND_HOST=0.0.0.0` to listen on all network interfaces, or set it to a specific host/IP for a fixed deployment.
 
