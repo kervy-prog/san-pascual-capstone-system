@@ -96,6 +96,8 @@ screens up to 800px wide. Wider screens retain the left navigation sidebar.
 Mobile headers use the top half of the supplied barangay hall photo with a dark
 overlay for readability. Module links appear in a fully visible, wrapping tile
 grid rather than a horizontally scrolling strip.
+The same photo background appears only in the mobile sign-in/registration welcome
+header; form backgrounds and the desktop sign-in layout remain unchanged.
 
 For phone or another laptop access on the same Wi-Fi, open `http://<computer-ip>:5500`. Set `FRONTEND_HOST=0.0.0.0` to listen on all network interfaces, or set it to a specific host/IP for a fixed deployment.
 
