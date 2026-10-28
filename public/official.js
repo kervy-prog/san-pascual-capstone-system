@@ -271,7 +271,8 @@ async function loadDashboard() {
     document.querySelector('#submitted-count').textContent = data.counts.submitted;
     document.querySelector('#resolved-count').textContent = data.counts.resolved;
     document.querySelector('#report-list').innerHTML = data.reports.length ? data.reports.map(reportRow).join('') : '<tr><td colspan="6" class="empty-state">No infrastructure reports yet.</td></tr>';
-    document.querySelector('#hazard-list').innerHTML = data.reports.length ? data.reports.map(hazardCard).join('') : '<p class="empty-state">No designated hazards yet.</p>';
+    const designatedHazards = data.reports.filter((report) => (report.currentStatus || report.status) !== 'RESOLVED');
+    document.querySelector('#hazard-list').innerHTML = designatedHazards.length ? designatedHazards.map(hazardCard).join('') : '<p class="empty-state">No unresolved designated hazards. Resolved reports are available in Reports.</p>';
 
     document.querySelectorAll('.action-btn').forEach((btn) => {
       btn.addEventListener('click', () => updateReportStatus(btn.dataset.actionId, btn.dataset.actionStatus));
