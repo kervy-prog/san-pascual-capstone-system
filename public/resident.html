@@ -151,8 +151,8 @@
           <div class="form-grid">
             <label class="field">
               <span>Upload photos</span>
-              <input id="report-media" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
-              <small class="field-hint">Up to 3 photos only (JPG, PNG, WebP or GIF), 10 MB each and 25 MB total. Videos are not accepted.</small>
+              <input id="report-media" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="report-photo-limit" multiple />
+              <small class="field-hint photo-limit-notice" id="report-photo-limit"><strong>Upload only 3 photos.</strong> JPG, PNG, WebP or GIF; up to 10 MB each and 25 MB total. Videos are not accepted.</small>
             </label>
 
             <label class="field">

@@ -79,6 +79,9 @@ Set the private bucket's per-object limit to at least 10 MB and allow JPEG, PNG,
 
 ### Main screens
 
+The resident report form uses bold, high-contrast field labels and a highlighted
+"Upload only 3 photos" notice below the photo picker.
+
 - `/` - resident sign in and registration
 - `/resident.html` - resident desk
 - `/official.html` - Barangay Official work queue
