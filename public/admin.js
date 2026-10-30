@@ -487,11 +487,25 @@ async function assignReport(id, officialId) {
   }
 }
 
+const approvalToast = document.querySelector('#approval-toast');
+let approvalToastTimer;
+
+function showApprovalToast(text) {
+  clearTimeout(approvalToastTimer);
+  approvalToast.textContent = text;
+  approvalToast.classList.add('visible');
+  approvalToastTimer = setTimeout(() => {
+    approvalToast.classList.remove('visible');
+    approvalToast.textContent = '';
+  }, 4000);
+}
+
 async function updateApproval(id, status) {
   try {
     await request(`/accounts/${id}/approval`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
     message.textContent = status === 'APPROVED' ? 'Account approved.' : 'Account rejected.';
     message.classList.remove('error');
+    if (status === 'APPROVED') showApprovalToast('User account approved successfully.');
     await loadDashboard();
   } catch (error) {
     message.textContent = error.message;

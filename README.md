@@ -89,6 +89,8 @@ Designated hazards. Resolving a report refreshes the work queue without deleting
 
 The admin resident and barangay official directories are sorted by last name (A-Z),
 then first and middle name for matching surnames.
+Successful account approval also displays a confirmation popup for four seconds,
+without requiring an OK button or interrupting the admin's work.
 
 The sign-in page and dashboards display the barangay seal. All dashboards use a
 horizontal header with wrapping module links and Sign out at the top right on
