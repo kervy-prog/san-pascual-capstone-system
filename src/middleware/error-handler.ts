@@ -17,7 +17,7 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     response.status(tooLarge ? 413 : 400).json({
       error: tooLarge
         ? "Each report media file must be 4 MB or smaller, with no more than 4 MB total."
-        : "Report upload is invalid or exceeds the 5-file limit.",
+        : "Upload is invalid or exceeds the file limit. New reports accept up to 3 photos only.",
     });
     return;
   }

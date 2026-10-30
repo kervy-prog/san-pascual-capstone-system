@@ -68,14 +68,14 @@ accounts cannot receive a login token.
 
 ### Larger report media on Vercel
 
-Vercel serverless requests have a roughly 4.5 MB body limit. Larger report photos and videos therefore upload directly to a private Supabase Storage bucket using short-lived signed URLs. Configure these Vercel environment variables:
+Vercel serverless requests have a roughly 4.5 MB body limit. Larger report photos therefore upload directly to a private Supabase Storage bucket using short-lived signed URLs. Configure these Vercel environment variables:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY` (the public anon/publishable key; never use the service-role key here)
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side secret; never expose it to browser code)
 - `SUPABASE_STORAGE_BUCKET` (defaults to `private-uploads`)
 
-Set the private bucket's per-object limit to at least 10 MB and allow JPEG, PNG, WebP, GIF, MP4, WebM, and QuickTime media. The application permits up to five files, 10 MB each, and 25 MB total per report. Redeploy after changing Vercel environment variables. Without cloud storage configuration, local development falls back to multipart uploads limited to 4 MB total.
+Set the private bucket's per-object limit to at least 10 MB and allow JPEG, PNG, WebP and GIF images. New reports accept up to three photos only, 10 MB each, and 25 MB total per report; videos are rejected. Existing report attachments remain viewable. Redeploy after changing Vercel environment variables. Without cloud storage configuration, local development falls back to multipart uploads limited to 4 MB total.
 
 ### Main screens
 

@@ -119,8 +119,13 @@ reportMediaInput.addEventListener('change', () => {
   let tooManyFiles = false;
   let fileTooLarge = false;
   let reportTooLarge = false;
+  let invalidType = false;
   for (const file of incomingFiles) {
-    if (selectedMediaFiles.length >= 5) {
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      invalidType = true;
+      continue;
+    }
+    if (selectedMediaFiles.length >= 3) {
       tooManyFiles = true;
       continue;
     }
@@ -137,9 +142,10 @@ reportMediaInput.addEventListener('change', () => {
   }
   reportMediaInput.value = '';
   renderMediaPreview();
-  if (fileTooLarge) showReportMessage('Each photo or video must be 10 MB or smaller.', true);
-  else if (reportTooLarge) showReportMessage('All report photos and videos must total no more than 25 MB.', true);
-  else if (tooManyFiles) showReportMessage('You can upload a maximum of 5 media files.', true);
+  if (invalidType) showReportMessage('Only JPG, PNG, WebP or GIF photos are accepted. Videos are not allowed.', true);
+  else if (fileTooLarge) showReportMessage('Each photo must be 10 MB or smaller.', true);
+  else if (reportTooLarge) showReportMessage('All report photos must total no more than 25 MB.', true);
+  else if (tooManyFiles) showReportMessage('You can upload a maximum of 3 photos.', true);
 });
 
 async function uploadReportMediaDirectly(files) {
@@ -329,7 +335,7 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
         ? Object.values(data.details).flat().filter(Boolean).join(' ')
         : '';
       const statusMessage = response.status === 413
-        ? 'Report upload exceeds the configured storage limit. Photos and videos can total up to 25 MB when cloud storage is enabled.'
+        ? 'Report upload exceeds the configured storage limit. Photos can total up to 25 MB when cloud storage is enabled.'
         : `Unable to submit infrastructure report (HTTP ${response.status}). Please try again.`;
       throw new Error(validationDetails || data.error || statusMessage);
     }

@@ -21,14 +21,17 @@ const reportMimeExtensions: Record<string, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
   "image/gif": ".gif",
-  "video/mp4": ".mp4",
-  "video/webm": ".webm",
-  "video/quicktime": ".mov",
 };
 const reportUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: maxReportMediaBytes, files: 5 },
-  fileFilter: (_request, file, callback) => callback(null, file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")),
+  limits: { fileSize: maxReportMediaBytes, files: 3 },
+  fileFilter: (_request, file, callback) => {
+    if (!Object.hasOwn(reportMimeExtensions, file.mimetype)) {
+      callback(new z.ZodError([{ code: "custom", path: ["media"], message: "Only JPG, PNG, WebP or GIF photos are accepted." }]));
+      return;
+    }
+    callback(null, true);
+  },
 });
 const categoryNames: Record<string, string> = {
   roads: "Roads and traffic",
@@ -54,9 +57,9 @@ const createRequestSchema = z.object({
   uploadedMedia: z.array(z.object({
     storagePath: z.string().min(1).max(300),
     originalname: z.string().trim().min(1).max(255),
-    mimetype: z.string().trim().min(1).max(120),
+    mimetype: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
     size: z.number().int().positive().max(maxDirectUploadFileBytes),
-  })).max(5).optional(),
+  })).max(3, "A report accepts a maximum of 3 photos.").optional(),
 });
 
 router.get("/", async (_request, response, next) => {
@@ -157,7 +160,7 @@ router.post("/uploads/sign", requireAuth, async (request: AuthRequest, response,
     }
     const input = z.object({
       fileName: z.string().trim().min(1).max(255),
-      contentType: z.string().trim().refine((value) => Object.hasOwn(reportMimeExtensions, value), "Choose a supported photo or video format"),
+      contentType: z.string().trim().refine((value) => Object.hasOwn(reportMimeExtensions, value), "Choose a JPG, PNG, WebP or GIF photo. Videos are not accepted."),
       size: z.number().int().positive().max(maxDirectUploadFileBytes),
     }).parse(request.body);
     const extension = reportMimeExtensions[input.contentType];
@@ -170,7 +173,7 @@ router.post("/uploads/sign", requireAuth, async (request: AuthRequest, response,
   }
 });
 
-router.post("/", requireAuth, reportUpload.array("media", 5), async (request: AuthRequest, response, next) => {
+router.post("/", requireAuth, reportUpload.array("media", 3), async (request: AuthRequest, response, next) => {
   try {
     const input = createRequestSchema.parse(request.body);
     if (!request.userId) {
