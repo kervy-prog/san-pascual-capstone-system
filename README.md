@@ -111,6 +111,9 @@ permission denial, and logout on a real device before distributing publicly.
 
 The resident report form uses bold, high-contrast field labels and a highlighted
 "Upload only 3 photos" notice below the photo picker.
+Photo submissions acquire location and upload photos concurrently. After confirming
+cloud upload availability, up to three photos upload in parallel; location and upload
+validation still complete before the report is submitted.
 
 - `/` - resident sign in and registration
 - `/resident.html` - resident desk

@@ -149,17 +149,18 @@ reportMediaInput.addEventListener('change', () => {
 });
 
 async function uploadReportMediaDirectly(files) {
-  const uploadedMedia = [];
-  for (const file of files) {
+  async function signFile(file) {
     const signResponse = await fetch(`${API_BASE_URL}/api/requests/uploads/sign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
     });
     const signedUpload = await signResponse.json().catch(() => ({}));
-    if (signResponse.status === 503 && uploadedMedia.length === 0) return null;
+    if (signResponse.status === 503) return null;
     if (!signResponse.ok) throw new Error(signedUpload.error || `Unable to prepare media upload (HTTP ${signResponse.status}).`);
-
+    return signedUpload;
+  }
+  async function uploadFile(file, signedUpload) {
     const uploadResponse = await fetch(signedUpload.signedUrl, {
       method: 'PUT',
       headers: {
@@ -172,14 +173,21 @@ async function uploadReportMediaDirectly(files) {
     if (!uploadResponse.ok) {
       throw new Error(`Unable to upload ${file.name} to cloud storage (HTTP ${uploadResponse.status}). No report was submitted.`);
     }
-    uploadedMedia.push({
+    return {
       storagePath: signedUpload.storagePath,
       originalname: file.name,
       mimetype: file.type,
       size: file.size,
-    });
+    };
   }
-  return uploadedMedia;
+  if (!files.length) return [];
+  const firstUpload = await signFile(files[0]);
+  if (firstUpload === null) return null;
+  return Promise.all(files.map(async (file, index) => {
+    const signedUpload = index === 0 ? firstUpload : await signFile(file);
+    if (signedUpload === null) throw new Error('Cloud uploads became unavailable. No report was submitted; please try again.');
+    return uploadFile(file, signedUpload);
+  }));
 }
 
 function closeReportModal() {
@@ -282,18 +290,16 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
   submitReportButton.querySelector('span').textContent = 'Submitting...';
   try {
     let currentLocation;
-    if (mediaFiles.length > 0) {
-      try {
-        currentLocation = await getCurrentLocation();
-        payload.append('locationLatitude', String(currentLocation.latitude));
-        payload.append('locationLongitude', String(currentLocation.longitude));
-      } catch {
-        // The server will still inspect the image's EXIF GPS metadata.
-      }
-    }
     let uploadedMedia;
     if (mediaFiles.length > 0) {
-      uploadedMedia = await uploadReportMediaDirectly(mediaFiles);
+      [currentLocation, uploadedMedia] = await Promise.all([
+        getCurrentLocation().catch(() => undefined),
+        uploadReportMediaDirectly(mediaFiles),
+      ]);
+      if (currentLocation) {
+        payload.append('locationLatitude', String(currentLocation.latitude));
+        payload.append('locationLongitude', String(currentLocation.longitude));
+      }
       if (uploadedMedia === null) {
         const totalMediaBytes = mediaFiles.reduce((total, file) => total + file.size, 0);
         if (totalMediaBytes > maxMultipartMediaBytes) {
