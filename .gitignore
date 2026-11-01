@@ -8,3 +8,13 @@ private-uploads/
 prisma/dev.db
 prisma/dev.db-journal
 .vercel
+mobile/www/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor.config.json
+mobile/android/app/src/main/assets/capacitor.plugins.json
+*.jks
+*.keystore

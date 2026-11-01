@@ -193,6 +193,7 @@ document.querySelector('#close-report-modal').addEventListener('click', () => {
 });
 
 function getCurrentLocation() {
+  if (window.sanPascualNativeLocation) return window.sanPascualNativeLocation();
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Location services are unavailable in this browser.'));

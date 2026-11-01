@@ -77,6 +77,36 @@ Vercel serverless requests have a roughly 4.5 MB body limit. Larger report photo
 
 Set the private bucket's per-object limit to at least 10 MB and allow JPEG, PNG, WebP and GIF images. New reports accept up to three photos only, 10 MB each, and 25 MB total per report; videos are rejected. Existing report attachments remain viewable. Redeploy after changing Vercel environment variables. Without cloud storage configuration, local development falls back to multipart uploads limited to 4 MB total.
 
+### Android APK (Capacitor)
+
+The `mobile` project packages the existing UI with Capacitor 7 in an Android
+WebView. It connects to the live HTTPS Vercel API; no database credentials or
+server secrets are bundled. Android 6.0 or newer and an internet connection are
+required. Website UI updates require a new APK; backend changes remain live.
+
+The **Build Android APK** GitHub Actions workflow runs on mobile/UI changes to
+`main` and can also be run manually from GitHub's Actions tab. Download the
+**San-Pascual-Connect-APK** artifact from a successful run, extract it, and install
+`app-debug.apk` on the phone (allow installation from that download source).
+This is a debug-signed demo APK, not a Play Store release. Future debug builds
+may use a different signing key and require uninstalling the old app first.
+Uninstalling clears saved sign-in data.
+
+For Android Studio development:
+
+```powershell
+Set-Location mobile
+npm ci
+npm run sync
+npx cap open android
+```
+
+The app requests location only when a report needs a location pin, uses the
+Android file picker for photos/verification documents, and supports the hardware
+Back button. Native location permission denial retains the website's EXIF/location
+fallback. App backups and cleartext HTTP are disabled. Test login, photo upload,
+permission denial, and logout on a real device before distributing publicly.
+
 ### Main screens
 
 The resident report form uses bold, high-contrast field labels and a highlighted

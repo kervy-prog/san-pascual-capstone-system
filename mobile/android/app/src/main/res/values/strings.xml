@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">San Pascual Connect</string>
+    <string name="title_activity_main">San Pascual Connect</string>
+    <string name="package_name">ph.gov.sanpascual.connect</string>
+    <string name="custom_url_scheme">ph.gov.sanpascual.connect</string>
+</resources>

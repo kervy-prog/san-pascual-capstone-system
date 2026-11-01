@@ -1,0 +1,8 @@
+{
+  "appId": "ph.gov.sanpascual.connect",
+  "appName": "San Pascual Connect",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
