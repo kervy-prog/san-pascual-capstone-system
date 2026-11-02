@@ -113,8 +113,7 @@ function renderMediaPreview() {
   });
 }
 
-reportMediaInput.addEventListener('change', () => {
-  const incomingFiles = Array.from(reportMediaInput.files || []);
+function addReportPhotos(incomingFiles) {
   let selectedBytes = selectedMediaFiles.reduce((total, file) => total + file.size, 0);
   let tooManyFiles = false;
   let fileTooLarge = false;
@@ -140,13 +139,41 @@ reportMediaInput.addEventListener('change', () => {
     selectedMediaFiles.push(file);
     selectedBytes += file.size;
   }
-  reportMediaInput.value = '';
   renderMediaPreview();
   if (invalidType) showReportMessage('Only JPG, PNG, WebP or GIF photos are accepted. Videos are not allowed.', true);
   else if (fileTooLarge) showReportMessage('Each photo must be 10 MB or smaller.', true);
   else if (reportTooLarge) showReportMessage('All report photos must total no more than 25 MB.', true);
   else if (tooManyFiles) showReportMessage('You can upload a maximum of 3 photos.', true);
+}
+
+reportMediaInput.addEventListener('change', () => {
+  addReportPhotos(Array.from(reportMediaInput.files || []));
+  reportMediaInput.value = '';
 });
+
+const takePhotoButton = document.querySelector('#take-report-photo');
+if (window.sanPascualTakePhoto) {
+  takePhotoButton.hidden = false;
+  takePhotoButton.addEventListener('click', async () => {
+    if (takePhotoButton.disabled || submitReportButton.disabled) return;
+    if (selectedMediaFiles.length >= 3) {
+      showReportMessage('You can upload a maximum of 3 photos.', true);
+      return;
+    }
+    takePhotoButton.disabled = true;
+    submitReportButton.disabled = true;
+    try {
+      const photo = await window.sanPascualTakePhoto();
+      if (photo) addReportPhotos([photo]);
+    } catch (error) {
+      console.error('Unable to capture report photo:', error);
+      showReportMessage('Unable to take a photo. Check camera access and try again, or choose an existing photo.', true);
+    } finally {
+      takePhotoButton.disabled = false;
+      submitReportButton.disabled = false;
+    }
+  });
+}
 
 async function uploadReportMediaDirectly(files) {
   async function signFile(file) {

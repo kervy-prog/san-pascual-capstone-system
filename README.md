@@ -103,7 +103,12 @@ npx cap open android
 
 The app requests location only when a report needs a location pin, uses the
 Android file picker for photos/verification documents, and supports the hardware
-Back button. Native location permission denial retains the website's EXIF/location
+Back button. In the resident report form, **Take photo** opens the phone camera
+and adds the captured photo to the preview. Captured and selected photos share
+the three-photo, 10 MB per-photo, and 25 MB combined limits. Canceling the camera
+keeps previously selected photos. This button requires an updated APK; the website
+keeps its existing photo picker. Camera photos are not saved to the phone gallery.
+Native location permission denial retains the website's EXIF/location
 fallback. App backups and cleartext HTTP are disabled. Test login, photo upload,
 permission denial, and logout on a real device before distributing publicly.
 
@@ -120,6 +125,8 @@ If a network connection fails, check My reports before resubmitting because the
 server may have saved the report even if the response did not reach the device.
 Run `node scripts/test-report-submission.cjs` to check JSON and multipart transport
 selection and network-error handling without creating reports.
+Run `node scripts/test-report-camera.cjs` to check native capture, cancellation,
+errors, and the shared photo limits without opening a camera or creating reports.
 
 - `/` - resident sign in and registration
 - `/resident.html` - resident desk
