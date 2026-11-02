@@ -114,6 +114,12 @@ The resident report form uses bold, high-contrast field labels and a highlighted
 Photo submissions acquire location and upload photos concurrently. After confirming
 cloud upload availability, up to three photos upload in parallel; location and upload
 validation still complete before the report is submitted.
+Reports without photos use JSON (the same transport as login), including in the
+Android app. Multipart submission is reserved for the photo-upload fallback.
+If a network connection fails, check My reports before resubmitting because the
+server may have saved the report even if the response did not reach the device.
+Run `node scripts/test-report-submission.cjs` to check JSON and multipart transport
+selection and network-error handling without creating reports.
 
 - `/` - resident sign in and registration
 - `/resident.html` - resident desk

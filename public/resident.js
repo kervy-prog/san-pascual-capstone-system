@@ -310,7 +310,7 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
     }
     const headers = { Authorization: `Bearer ${token}` };
     let requestBody = payload;
-    if (uploadedMedia) {
+    if (mediaFiles.length === 0 || uploadedMedia) {
       headers['Content-Type'] = 'application/json';
       requestBody = JSON.stringify({
         categoryId,
@@ -355,7 +355,11 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
     autoFillSubmissionDateTime();
     await fetchResidentProfile();
   } catch (error) {
-    showReportMessage(error.message, true);
+    const networkFailure = error instanceof TypeError && /fetch|network/i.test(error.message);
+    if (networkFailure) console.error('Report submission network failure:', error);
+    showReportMessage(networkFailure
+      ? 'The app could not confirm submission with the server. Check your connection and My reports before trying again, to avoid a duplicate report.'
+      : error.message, true);
     if (error.message === "Sorry, the uploaded image isn't part of our Barangay") {
       showReportModal({ error: true, message: error.message });
     }
