@@ -138,6 +138,10 @@ Designated hazards. Resolving a report refreshes the work queue without deleting
 
 The admin resident and barangay official directories are sorted by last name (A-Z),
 then first and middle name for matching surnames.
+The admin directories are labeled Registered Residents and Registered Officials.
+Report progress uses Work completed, Work in progress, and Other unresolved reports,
+with explanations of each group. The last group includes reports awaiting review
+or action and rejected or cancelled reports; in-progress reports remain separate.
 Successful account approval also displays a confirmation popup for four seconds,
 without requiring an OK button or interrupting the admin's work.
 

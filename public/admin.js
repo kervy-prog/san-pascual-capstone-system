@@ -276,10 +276,10 @@ async function loadApprovedResidents() {
     const residents = await request('/residents');
     document.querySelector('#resident-list').innerHTML = residents.length
       ? residents.map((resident) => `<tr><td><strong>${resident.firstName} ${resident.middleName} ${resident.lastName}</strong></td><td>${resident.email}</td><td>${resident.phone}</td><td>${resident.address}, ${resident.barangay}, ${resident.municipality}, ${resident.province}</td><td>${resident.gender}</td><td>${new Date(resident.updatedAt).toLocaleDateString('en-PH')}</td><td><button class="delete-button" data-delete-id="${resident.id}" data-delete-name="${resident.firstName} ${resident.lastName}">Delete</button></td></tr>`).join('')
-      : '<tr><td colspan="7" class="empty-state">No Barangay Residents yet.</td></tr>';
+      : '<tr><td colspan="7" class="empty-state">No registered residents yet.</td></tr>';
     document.querySelectorAll('#resident-list [data-delete-id]').forEach((button) => button.addEventListener('click', () => removeAccount(button.dataset.deleteId, button.dataset.deleteName)));
   } catch (error) {
-    document.querySelector('#resident-list').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load resident database.</td></tr>';
+    document.querySelector('#resident-list').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load registered residents.</td></tr>';
     message.textContent = error.message;
     message.classList.add('error');
   }
@@ -295,11 +295,11 @@ async function loadApprovedOfficials() {
         const resident = official.resident;
         return `<tr><td><strong>${resident.firstName} ${resident.middleName} ${resident.lastName}</strong></td><td>${official.designationPosition}</td><td><select class="official-status" data-official-id="${official.id}"><option value="ACTIVE" ${official.status === 'ACTIVE' ? 'selected' : ''}>Active</option><option value="RETIRED" ${official.status === 'RETIRED' ? 'selected' : ''}>Retired</option><option value="NOT_ON_DUTY" ${official.status === 'NOT_ON_DUTY' ? 'selected' : ''}>Not on duty</option></select></td><td>${resident.email}</td><td>${official.contactNumber || resident.phone}</td><td>${resident.address}, ${resident.barangay}, ${resident.municipality}, ${resident.province}</td><td><button class="delete-button" data-delete-id="${resident.id}" data-delete-name="${resident.firstName} ${resident.lastName}">Delete</button></td></tr>`;
       }).join('')
-      : '<tr><td colspan="7" class="empty-state">No Barangay Officials yet.</td></tr>';
+      : '<tr><td colspan="7" class="empty-state">No registered officials yet.</td></tr>';
     document.querySelectorAll('#official-list [data-official-id]').forEach((select) => select.addEventListener('change', () => updateOfficialStatus(select.dataset.officialId, select.value)));
     document.querySelectorAll('#official-list [data-delete-id]').forEach((button) => button.addEventListener('click', () => removeAccount(button.dataset.deleteId, button.dataset.deleteName)));
   } catch (error) {
-    document.querySelector('#official-list').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load Barangay Officials.</td></tr>';
+    document.querySelector('#official-list').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load registered officials.</td></tr>';
     message.textContent = error.message;
     message.classList.add('error');
   }
