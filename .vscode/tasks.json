@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Frontend dev server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"frontend"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "API dev server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
