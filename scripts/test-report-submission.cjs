@@ -31,7 +31,7 @@ async function checkSubmission(files, uploadedMedia, networkError = false) {
     reportDateInput: { value: '2026-01-01T10:00' },
     message: { classList: { remove() {} } },
     submitReportButton: { disabled: false, querySelector() { return {}; } },
-    getCurrentLocation: async () => ({ latitude: 15, longitude: 120 }),
+    getCurrentLocation: async () => { throw new Error('Submission must not request device location'); },
     uploadReportMediaDirectly: async () => uploadedMedia,
     maxMultipartMediaBytes: 4 * 1024 * 1024,
     API_BASE_URL: 'https://example.invalid',
@@ -56,30 +56,39 @@ async function checkSubmission(files, uploadedMedia, networkError = false) {
 
 (async () => {
   const noPhotos = await checkSubmission([]);
-  assert.equal(noPhotos.request.headers['Content-Type'], 'application/json');
-  const body = JSON.parse(noPhotos.request.body);
+  assert.equal(noPhotos.request, undefined);
+  assert.match(noPhotos.displayedMessage, /exactly 3 photos/);
+  assert.equal(noPhotos.reset, false);
+
+  const photo = new Blob(['test-only'], { type: 'image/png' });
+  for (const count of [1, 2, 4]) {
+    const invalid = await checkSubmission(Array(count).fill(photo));
+    assert.equal(invalid.request, undefined);
+    assert.match(invalid.displayedMessage, /exactly 3 photos/);
+  }
+  const photos = [photo, photo, photo];
+  const references = photos.map((photo, index) => ({ storagePath: `reports/test-${index}.png`, originalname: `test-${index}.png`, mimetype: 'image/png', size: photo.size }));
+  const direct = await checkSubmission(photos, references);
+  assert.equal(direct.request.headers['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(direct.request.body).uploadedMedia, references);
+  const body = JSON.parse(direct.request.body);
   assert.equal(body.categoryId, 'roads');
   assert.equal(body.currentStatus, 'SUBMITTED');
   assert.equal(body.submitAnonymously, false);
-  assert.equal(body.uploadedMedia, undefined);
-  assert(noPhotos.reset);
+  assert.equal(body.locationLatitude, undefined);
+  assert.equal(body.locationLongitude, undefined);
+  assert(direct.reset);
 
-  const photo = new Blob(['test-only'], { type: 'image/png' });
-  const references = [{ storagePath: 'reports/test.png', originalname: 'test.png', mimetype: 'image/png', size: photo.size }];
-  const direct = await checkSubmission([photo], references);
-  assert.equal(direct.request.headers['Content-Type'], 'application/json');
-  assert.deepEqual(JSON.parse(direct.request.body).uploadedMedia, references);
-  assert.equal(JSON.parse(direct.request.body).locationLatitude, 15);
-
-  const fallback = await checkSubmission([photo], null);
+  const fallback = await checkSubmission(photos, null);
   assert(fallback.request.body instanceof FormData);
   assert.equal(fallback.request.headers['Content-Type'], undefined);
-  assert.equal(fallback.request.body.getAll('media').length, 1);
+  assert.equal(fallback.request.body.getAll('media').length, 3);
+  assert.equal(fallback.request.body.get('locationLatitude'), null);
 
-  const failure = await checkSubmission([], undefined, true);
+  const failure = await checkSubmission(photos, references, true);
   assert.match(failure.displayedMessage, /My reports/);
   assert.equal(failure.reset, false);
-  console.log('PASS: JSON without photos, direct photo references, multipart fallback, and network error preserves form.');
+  console.log('PASS: exactly 3 photos, direct/multipart transport, no device coordinates, and network error preserves form.');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

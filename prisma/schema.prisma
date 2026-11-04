@@ -205,3 +205,10 @@ model AppSetting {
   value     Boolean  @default(true)
   updatedAt DateTime @updatedAt
 }
+
+model ReportGeofence {
+  id        String   @id
+  boundary  Json
+  revision  Int      @default(1)
+  updatedAt DateTime @updatedAt
+}

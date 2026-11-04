@@ -157,7 +157,10 @@ async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}/api/admin${path}`, { ...options, headers: { Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Admin request failed');
+  if (!response.ok) {
+    const details = data.details ? Object.values(data.details).flat().filter(Boolean).join(' ') : '';
+    throw new Error(details || data.error || 'Admin request failed');
+  }
   return data;
 }
 
@@ -195,6 +198,8 @@ async function loadGeofenceSetting() {
   try {
     const setting = await request('/settings/report-geofence');
     renderGeofenceSetting(setting.enforceReportGeofence);
+    reportGeofenceToggle.disabled = false;
+    window.renderAdminGeofence(setting, request);
   } catch (error) {
     geofenceStatus.textContent = 'Unable to load setting';
     message.textContent = error.message;
@@ -207,7 +212,7 @@ reportGeofenceToggle.addEventListener('change', async () => {
   try {
     const setting = await request('/settings/report-geofence', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enforceReportGeofence: reportGeofenceToggle.checked }) });
     renderGeofenceSetting(setting.enforceReportGeofence);
-    message.textContent = setting.enforceReportGeofence ? 'Barangay location range enforcement enabled.' : 'Location range enforcement disabled. Report locations will still be tagged.';
+    message.textContent = setting.enforceReportGeofence ? 'Photo GPS and barangay boundary checks enabled.' : 'Photo GPS and boundary checks disabled. Exactly 3 photos are still required.';
     message.classList.remove('error');
   } catch (error) {
     reportGeofenceToggle.checked = !reportGeofenceToggle.checked;

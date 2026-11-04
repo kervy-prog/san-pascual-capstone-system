@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp');
+const { gps } = require('exifr');
 
 const BASE_URL = process.env.API_BASE_URL || 'http://127.0.0.1:3000';
 
@@ -14,6 +15,14 @@ async function assert(condition, message) {
 
 async function run() {
   console.log("=== STARTING FULL END-TO-END SYSTEM TEST ===");
+  if (!process.env.REPORT_TEST_PHOTO) {
+    throw new Error('Set REPORT_TEST_PHOTO to an original GPS-tagged JPEG taken inside the configured reporting vicinity. This test creates records; use a test deployment.');
+  }
+  const reportImage = fs.readFileSync(process.env.REPORT_TEST_PHOTO);
+  const photoGps = await gps(reportImage);
+  if (!Number.isFinite(photoGps?.latitude) || !Number.isFinite(photoGps?.longitude)) {
+    throw new Error('REPORT_TEST_PHOTO must contain readable embedded GPS. Device coordinates are not used.');
+  }
 
   // 1. Health Checks
   console.log("\n[Test 1] Health Endpoints");
@@ -209,13 +218,9 @@ async function run() {
   reportForm.append('currentStatus', 'SUBMITTED');
   reportForm.append('dateSubmitted', new Date().toISOString());
   reportForm.append('submitAnonymously', 'false');
-  reportForm.append('locationLatitude', '15.0178547');
-  reportForm.append('locationLongitude', '120.0829188');
-
-  const reportImage = await sharp(crypto.randomBytes(512 * 512 * 3), {
-    raw: { width: 512, height: 512, channels: 3 },
-  }).jpeg({ quality: 100 }).toBuffer();
-  reportForm.append('media', new Blob([reportImage], { type: 'image/jpeg' }), 'clogged_drain.jpg');
+  for (let index = 0; index < 3; index++) {
+    reportForm.append('media', new Blob([reportImage], { type: 'image/jpeg' }), `clogged_drain_${index}.jpg`);
+  }
 
   const signedUploadRes = await fetch(`${BASE_URL}/api/requests/uploads/sign`, {
     method: 'POST',
@@ -225,13 +230,27 @@ async function run() {
   let reportSubmitBody = reportForm;
   const reportSubmitHeaders = { Authorization: `Bearer ${residentToken}` };
   if (signedUploadRes.status === 201) {
-    const signedUpload = await signedUploadRes.json();
-    const directUploadRes = await fetch(signedUpload.signedUrl, {
-      method: 'PUT',
-      headers: { apikey: signedUpload.uploadApiKey, 'Content-Type': 'image/jpeg', 'x-upsert': 'false' },
-      body: reportImage,
-    });
-    await assert(directUploadRes.ok, "Resident uploads report media directly to signed cloud storage");
+    const firstUpload = await signedUploadRes.json();
+    const uploadedMedia = [];
+    for (let index = 0; index < 3; index++) {
+      let signedUpload = firstUpload;
+      if (index > 0) {
+        const signedResponse = await fetch(`${BASE_URL}/api/requests/uploads/sign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${residentToken}` },
+          body: JSON.stringify({ fileName: `clogged_drain_${index}.jpg`, contentType: 'image/jpeg', size: reportImage.length }),
+        });
+        await assert(signedResponse.status === 201, 'Prepare signed upload for each of the 3 photos');
+        signedUpload = await signedResponse.json();
+      }
+      const directUploadRes = await fetch(signedUpload.signedUrl, {
+        method: 'PUT',
+        headers: { apikey: signedUpload.uploadApiKey, 'Content-Type': 'image/jpeg', 'x-upsert': 'false' },
+        body: reportImage,
+      });
+      await assert(directUploadRes.ok, "Resident uploads report media directly to signed cloud storage");
+      uploadedMedia.push({ storagePath: signedUpload.storagePath, originalname: `clogged_drain_${index}.jpg`, mimetype: 'image/jpeg', size: reportImage.length });
+    }
     reportSubmitHeaders['Content-Type'] = 'application/json';
     reportSubmitBody = JSON.stringify({
       categoryId: 'residential-issues',
@@ -241,9 +260,7 @@ async function run() {
       currentStatus: 'SUBMITTED',
       dateSubmitted: new Date().toISOString(),
       submitAnonymously: false,
-      locationLatitude: 15.0178547,
-      locationLongitude: 120.0829188,
-      uploadedMedia: [{ storagePath: signedUpload.storagePath, originalname: 'clogged_drain.jpg', mimetype: 'image/jpeg', size: reportImage.length }],
+      uploadedMedia,
     });
   } else {
     const signedUploadError = await signedUploadRes.json().catch(() => ({}));
@@ -271,7 +288,7 @@ async function run() {
   await assert(Boolean(createdReport), "Report visible in admin reports database");
   await assert(createdReport.category.name === 'Residential Issues', "Residential Issues category resolves to its database category");
   await assert(createdReport.urgencyLevel === 'CRITICAL', "Resident-selected urgency is saved on the report");
-  await assert(createdReport.media.length === 1, "Report media correctly linked");
+  await assert(createdReport.media.length === 3, "All 3 report photos correctly linked");
 
   const assignReportRes = await fetch(`${BASE_URL}/api/admin/reports/${reportId}/assignment`, {
     method: 'PATCH',

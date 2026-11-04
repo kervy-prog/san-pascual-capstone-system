@@ -153,7 +153,7 @@
               <span><label for="report-media">Upload photos</label></span>
               <input id="report-media" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="report-photo-limit" multiple />
               <button type="button" class="take-photo-button" id="take-report-photo" hidden>Take photo</button>
-              <small class="field-hint photo-limit-notice" id="report-photo-limit"><strong>Upload only 3 photos.</strong> JPG, PNG, WebP or GIF; up to 10 MB each and 25 MB total. Videos are not accepted.</small>
+              <small class="field-hint photo-limit-notice" id="report-photo-limit"><strong>Upload exactly 3 photos.</strong> JPG, PNG, WebP or GIF; up to 10 MB each and 25 MB total. Videos are not accepted. When barangay location checks are enabled, each original photo must have GPS tags inside the reporting vicinity. Enable location tags in your camera settings before taking photos. Screenshots and messaging-app copies often have no GPS tags. You may submit later from outside the barangay; your current device location is not used. If the in-app camera does not preserve GPS tags, choose the original GPS-tagged photos from your phone camera instead.</small>
             </div>
 
             <label class="field">
@@ -166,8 +166,8 @@
 
           <div class="media-types">
             <span>Accepted:</span>
-            <strong>Up to 3 photos only</strong>
-            <span>Photo location data is checked when available.</span>
+            <strong>Exactly 3 photos required</strong>
+            <span>When location checks are enabled, all 3 photos need GPS tags inside the barangay vicinity.</span>
           </div>
 
           <button type="submit" class="submit-button" id="submit-report-button"><span>Submit report</span><span aria-hidden="true">→</span></button>

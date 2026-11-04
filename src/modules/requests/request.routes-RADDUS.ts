@@ -3,12 +3,11 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import multer from "multer";
-import { gps } from "exifr";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthRequest } from "../../middleware/require-auth.js";
-import { isWithinSanPascualVicinity } from "./report-geofence.js";
-import { geocodeBarangayCenter, geocodeReportedLandmark } from "../../lib/geocoder.js";
+import { getReportGeofenceSettings } from "./report-geofence-settings.js";
+import { ReportPhotoLocationError, validateReportPhotoLocations } from "./report-photo-location.js";
 import { createSignedReportUploadUrl, isDirectUploadConfigured, readStoredUpload, sendStoredFile, storeUpload } from "../../lib/file-storage.js";
 
 const router = Router();
@@ -201,6 +200,10 @@ router.post("/", requireAuth, reportUpload.array("media", 3), async (request: Au
       response.status(400).json({ error: "Use either direct uploads or multipart media, not both." });
       return;
     }
+    if (multipartFiles.length + uploadedMedia.length !== 3) {
+      response.status(422).json({ error: "Upload exactly 3 photos before submitting your report." });
+      return;
+    }
     const totalDirectUploadBytes = uploadedMedia.reduce((total, file) => total + file.size, 0);
     if (totalDirectUploadBytes > maxDirectUploadReportBytes) {
       response.status(413).json({ error: "Report media must total no more than 25 MB." });
@@ -223,45 +226,16 @@ router.post("/", requireAuth, reportUpload.array("media", 3), async (request: Au
     }));
     const files = [...multipartFiles, ...directFiles];
     const imageFiles = files.filter((file) => file.mimetype.startsWith("image/"));
-    const geofenceSetting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
-    const enforceReportGeofence = geofenceSetting?.value ?? true;
-    let photoLocation: { latitude: number; longitude: number } | undefined;
-
-    for (const file of imageFiles) {
-      const metadata = await gps(file.buffer).catch(() => undefined);
-      if (metadata && typeof metadata.latitude === "number" && typeof metadata.longitude === "number") {
-        photoLocation = metadata;
-        if (enforceReportGeofence && !isWithinSanPascualVicinity(metadata.latitude, metadata.longitude)) {
-          response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
-          return;
-        }
-      }
-    }
-
-    let submittedLocation = photoLocation || (input.locationLatitude !== undefined && input.locationLongitude !== undefined
-      ? { latitude: input.locationLatitude, longitude: input.locationLongitude }
-      : undefined);
-    let locationSource: "image-exif" | "device" | "landmark-geocode" | "landmark-geocode-approximate" | undefined = photoLocation
-      ? "image-exif"
-      : submittedLocation
-        ? "device"
-        : undefined;
-    if (imageFiles.length > 0 && !submittedLocation) {
-      submittedLocation = await geocodeReportedLandmark(input.exactLocationLandmark).catch(() => undefined);
-      locationSource = submittedLocation ? "landmark-geocode" : undefined;
-    }
-    if (imageFiles.length > 0 && !submittedLocation) {
-      submittedLocation = await geocodeBarangayCenter().catch(() => undefined);
-      locationSource = submittedLocation ? "landmark-geocode-approximate" : undefined;
-    }
-    if (imageFiles.length > 0 && !submittedLocation) {
-      response.status(422).json({ error: "A location pin is required for image reports. Allow device location or enable camera GPS metadata." });
+    const geofence = await getReportGeofenceSettings();
+    let submittedLocation;
+    try {
+      submittedLocation = await validateReportPhotoLocations(imageFiles, geofence.enforceReportGeofence, geofence.boundary);
+    } catch (error) {
+      if (!(error instanceof ReportPhotoLocationError)) throw error;
+      response.status(422).json({ error: error.message });
       return;
     }
-    if (enforceReportGeofence && submittedLocation && !isWithinSanPascualVicinity(submittedLocation.latitude, submittedLocation.longitude)) {
-      response.status(422).json({ error: "Sorry, the uploaded image isn't part of our Barangay" });
-      return;
-    }
+    const locationSource = submittedLocation ? "image-exif" : undefined;
 
     const created = await prisma.infrastructureReport.create({
       data: {

@@ -6,6 +6,7 @@
   <title>Admin Desk · San Pascual Connect</title>
   <link rel="stylesheet" href="/admin.css" />
   <link rel="stylesheet" href="/dashboard-header.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
 <body>
   <main class="admin-shell">
@@ -27,7 +28,20 @@
       <p class="dashboard-message" id="dashboard-message"></p>
       <section id="overview" class="admin-section active">
         <div class="stat-grid"><article class="stat-card"><span>Residents</span><strong id="resident-count">—</strong><small>registered accounts</small></article><article class="stat-card"><span>Officials</span><strong id="official-count">—</strong><small>official profiles</small></article><article class="stat-card highlight"><span>Needs review</span><strong id="pending-count">—</strong><small>awaiting approval</small></article></div>
-        <article class="settings-card"><div><p class="eyebrow">REPORT SETTINGS</p><h2>Barangay location range</h2><p>When enabled, image and submitted GPS locations must be within the Barangay San Pascual vicinity. Location tagging remains active when this is disabled.</p></div><label class="switch-control"><span id="geofence-status">Checking setting...</span><input id="report-geofence-toggle" type="checkbox" aria-label="Enforce Barangay location range"><span class="switch-slider"></span></label></article>
+        <article class="settings-card"><div><p class="eyebrow">REPORT SETTINGS</p><h2>Barangay location range</h2><p>When enabled, all 3 report photos must contain GPS coordinates inside the saved vicinity. Only the photo location is checked, not where the resident submits the report. When disabled, reports still require 3 photos but GPS and boundary checks are skipped.</p></div><label class="switch-control"><span id="geofence-status">Checking setting...</span><input id="report-geofence-toggle" type="checkbox" aria-label="Enforce Barangay location range" disabled><span class="switch-slider"></span></label></article>
+        <article class="geofence-card" aria-labelledby="geofence-title">
+          <div class="section-heading"><div><p class="eyebrow">REPORTING VICINITY</p><h2 id="geofence-title">Barangay San Pascual boundary</h2></div><button type="button" id="geofence-edit" disabled>Edit boundary</button></div>
+          <p>Draw the reporting vicinity agreed with barangay officials. This admin-defined boundary is not an official cadastral boundary.</p>
+          <p id="geofence-boundary-status" role="status">Loading saved boundary...</p>
+          <div id="geofence-map" aria-label="Barangay boundary map"></div>
+          <p id="geofence-map-error" role="alert"></p>
+          <div id="geofence-editor" hidden>
+            <p>Tap the map to add points around the barangay in order. Drag a numbered point to adjust it. Lines must not cross. Saving changes the location check for new reports only.</p>
+            <div class="geofence-coordinates"><label>Latitude<input id="geofence-latitude" type="number" step="any" min="-90" max="90"></label><label>Longitude<input id="geofence-longitude" type="number" step="any" min="-180" max="180"></label><button type="button" id="geofence-add">Add point</button></div>
+            <div class="geofence-actions"><button type="button" id="geofence-undo">Undo last point</button><button type="button" id="geofence-clear">Clear drawing</button><button type="button" id="geofence-cancel">Cancel</button><button type="button" id="geofence-save">Save boundary</button></div>
+          </div>
+          <p id="geofence-editor-message" role="status" aria-live="polite"></p>
+        </article>
         <article class="progress-card"><div class="section-heading"><div><p class="eyebrow">REPORT PROGRESS</p><h2>Infrastructure reports</h2></div><span class="progress-total"><strong id="report-progress-total">0</strong> total</span></div><div class="progress-chart" role="group" aria-label="Infrastructure report progress chart"><div class="progress-row"><div class="progress-label"><span>Work completed</span><strong id="report-done-count">0</strong></div><div class="progress-track"><span id="report-done-bar" class="progress-bar done"></span></div></div><div class="progress-row"><div class="progress-label"><span>Work in progress</span><strong id="report-ongoing-count">0</strong></div><div class="progress-track"><span id="report-ongoing-bar" class="progress-bar ongoing"></span></div></div><div class="progress-row"><div class="progress-label"><span>Other unresolved reports</span><strong id="report-unfinished-count">0</strong></div><div class="progress-track"><span id="report-unfinished-bar" class="progress-bar unfinished"></span></div></div></div></article>
         <article class="resolved-reports-card"><div class="section-heading"><div><p class="eyebrow">COMPLETED WORK</p><h2>Resolved reports</h2></div><span class="section-count" id="resolved-report-count">0</span></div><div class="report-table-wrap"><table><thead><tr><th>Completion #</th><th>Ticket</th><th>Category</th><th>Resident</th><th>Resolution results</th><th>Completed</th></tr></thead><tbody id="resolved-report-list"><tr><td colspan="6" class="empty-state">No reports resolved yet.</td></tr></tbody></table></div></article>
       </section>
@@ -68,6 +82,8 @@
   </div>
   <div class="approval-toast" id="approval-toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="/config.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="/admin-geofence.js" defer></script>
   <script src="/admin.js" defer></script>
 </body>
 </html>

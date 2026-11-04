@@ -227,21 +227,6 @@ document.querySelector('#close-report-modal').addEventListener('click', () => {
   if (!isError) document.querySelector('a[href="#reports"]').click();
 });
 
-function getCurrentLocation() {
-  if (window.sanPascualNativeLocation) return window.sanPascualNativeLocation();
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Location services are unavailable in this browser.'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
-      () => reject(new Error('Location permission was unavailable.')),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  });
-}
-
 function autoFillSubmissionDateTime() {
   if (!reportDateInput) return;
   const now = new Date();
@@ -311,22 +296,18 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
     showReportMessage('Please describe the hazard using at least 10 characters.', true);
     return;
   }
+  if (mediaFiles.length !== 3) {
+    showReportMessage('Upload exactly 3 photos before submitting your report.', true);
+    return;
+  }
 
   message.classList.remove('error');
   submitReportButton.disabled = true;
   submitReportButton.querySelector('span').textContent = 'Submitting...';
   try {
-    let currentLocation;
     let uploadedMedia;
     if (mediaFiles.length > 0) {
-      [currentLocation, uploadedMedia] = await Promise.all([
-        getCurrentLocation().catch(() => undefined),
-        uploadReportMediaDirectly(mediaFiles),
-      ]);
-      if (currentLocation) {
-        payload.append('locationLatitude', String(currentLocation.latitude));
-        payload.append('locationLongitude', String(currentLocation.longitude));
-      }
+      uploadedMedia = await uploadReportMediaDirectly(mediaFiles);
       if (uploadedMedia === null) {
         const totalMediaBytes = mediaFiles.reduce((total, file) => total + file.size, 0);
         if (totalMediaBytes > maxMultipartMediaBytes) {
@@ -347,8 +328,6 @@ document.querySelector('#infrastructure-form').addEventListener('submit', async 
         currentStatus: 'SUBMITTED',
         dateSubmitted: submittedAt,
         submitAnonymously: false,
-        locationLatitude: currentLocation?.latitude,
-        locationLongitude: currentLocation?.longitude,
         uploadedMedia,
       });
     }

@@ -8,6 +8,8 @@ import { requireAdmin } from "../../middleware/require-admin.js";
 import { sendStoredFile } from "../../lib/file-storage.js";
 import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
 import { getAdminActivityVersion } from "../../lib/report-activity.js";
+import { boundarySchema } from "../requests/report-geofence.js";
+import { BoundaryConflictError, getReportGeofenceSettings, saveReportBoundary } from "../requests/report-geofence-settings.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -30,8 +32,8 @@ const accountCredentialsSchema = z.object({
 
 router.get("/settings/report-geofence", async (_request, response, next) => {
   try {
-    const setting = await prisma.appSetting.findUnique({ where: { key: "enforceReportGeofence" } });
-    response.json({ enforceReportGeofence: setting?.value ?? true });
+    response.setHeader("Cache-Control", "no-store");
+    response.json(await getReportGeofenceSettings());
   } catch (error) {
     next(error);
   }
@@ -47,6 +49,22 @@ router.patch("/settings/report-geofence", async (request, response, next) => {
     });
     response.json({ enforceReportGeofence: setting.value });
   } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/settings/report-geofence/boundary", async (request, response, next) => {
+  try {
+    const input = z.object({
+      boundary: boundarySchema,
+      expectedRevision: z.number().int().min(0).max(2147483646),
+    }).strict().parse(request.body);
+    response.json(await saveReportBoundary(input.boundary, input.expectedRevision));
+  } catch (error) {
+    if (error instanceof BoundaryConflictError) {
+      response.status(409).json({ error: error.message });
+      return;
+    }
     next(error);
   }
 });
