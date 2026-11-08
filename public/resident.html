@@ -6,6 +6,7 @@
   <title>Resident Dashboard · San Pascual Connect</title>
   <link rel="stylesheet" href="/resident.css" />
   <link rel="stylesheet" href="/dashboard-header.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
 <body>
   <main class="resident-shell">
@@ -49,6 +50,18 @@
             <small>submitted cases</small>
           </article>
         </div>
+        <article class="resident-vicinity-card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">REPORTING VICINITY</p>
+              <h2>Barangay San Pascual boundary</h2>
+            </div>
+            <span id="resident-vicinity-status" role="status">Loading map...</span>
+          </div>
+          <p id="resident-vicinity-note" role="status"></p>
+          <div id="resident-vicinity-map" aria-label="Read-only map of the Barangay San Pascual reporting vicinity"></div>
+          <p id="resident-vicinity-error" role="alert"></p>
+        </article>
       </section>
 
       <section id="profile" class="resident-section">
@@ -194,6 +207,7 @@
   </div>
 
   <script src="/config.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="/resident.js" defer></script>
 </body>
 </html>

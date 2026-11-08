@@ -42,6 +42,25 @@ const categoryNames: Record<string, string> = {
   other: "Other",
 };
 
+router.get("/geofence", requireAuth, async (request: AuthRequest, response, next) => {
+  try {
+    if (request.userRole !== "RESIDENT") {
+      response.status(403).json({ error: "Resident access required" });
+      return;
+    }
+    const settings = await getReportGeofenceSettings();
+    response.setHeader("Cache-Control", "no-store");
+    response.json({
+      boundary: settings.boundary,
+      revision: settings.revision,
+      legacyVicinity: settings.legacyVicinity,
+      enforceReportGeofence: settings.enforceReportGeofence,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const createRequestSchema = z.object({
   categoryId: z.string().trim().min(1),
   urgencyLevel: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),

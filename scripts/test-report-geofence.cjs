@@ -175,6 +175,19 @@ function gpsJpeg(jpeg, location) {
     const settings = await fetch(endpoint, { headers: auth('ADMIN') });
     assert.equal(settings.status, 200);
     assert.equal((await settings.json()).revision, 2);
+    const residentGeofenceEndpoint = `${base}/api/requests/geofence`;
+    assert.equal((await fetch(residentGeofenceEndpoint)).status, 401);
+    assert.equal((await fetch(residentGeofenceEndpoint, { headers: auth('ADMIN') })).status, 403);
+    const residentBoundaryResponse = await fetch(residentGeofenceEndpoint, { headers: auth('RESIDENT') });
+    assert.equal(residentBoundaryResponse.status, 200);
+    assert.equal(residentBoundaryResponse.headers.get('cache-control'), 'no-store');
+    const residentBoundary = await residentBoundaryResponse.json();
+    assert.deepEqual(residentBoundary.boundary, [...boundary].reverse());
+    assert.equal(residentBoundary.revision, 2);
+    assert.equal(residentBoundary.enforceReportGeofence, true);
+    assert(!Object.hasOwn(residentBoundary, 'save'));
+    assert(!Object.hasOwn(residentBoundary, 'edit'));
+    assert.equal(stored.revision, 2, 'Read-only resident access must not modify the boundary');
     for (const [payload, status] of [
       [{ boundary: [boundary[0]], expectedRevision: 2 }, 400],
       [{ boundary, expectedRevision: 1 }, 409],
@@ -223,7 +236,7 @@ function gpsJpeg(jpeg, location) {
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
-  console.log('PASS: polygon geometry, real JPEG GPS, all 3 photos, legacy circle, enforcement off, saved revisions/conflicts, admin access, multipart/direct uploads, and device-location independence. No database or storage writes.');
+  console.log('PASS: polygon geometry, real JPEG GPS, all 3 photos, legacy circle, enforcement off, saved revisions/conflicts, admin/resident authorization, read-only resident boundary, multipart/direct uploads, and device-location independence. No database or storage writes.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

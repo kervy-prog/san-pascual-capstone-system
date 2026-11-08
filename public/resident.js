@@ -21,6 +21,68 @@ const resolutionProofModal = document.querySelector('#resolution-proof-modal');
 const resolutionProofImage = document.querySelector('#resolution-proof-image');
 const resolutionProofError = document.querySelector('#resolution-proof-error');
 let resolutionProofUrl = '';
+let vicinityMap;
+
+async function loadResidentVicinity() {
+  if (!token || !storedUser || storedUser.role !== 'RESIDENT') return;
+  const status = document.querySelector('#resident-vicinity-status');
+  const note = document.querySelector('#resident-vicinity-note');
+  const errorMessage = document.querySelector('#resident-vicinity-error');
+  if (!window.L) {
+    status.textContent = 'Map unavailable';
+    errorMessage.textContent = 'The map could not load. Check your internet connection and reload.';
+    return;
+  }
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/requests/geofence`, {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store',
+    });
+    const settings = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(settings.error || 'Unable to load the barangay vicinity.');
+    const mapElement = document.querySelector('#resident-vicinity-map');
+    if (!vicinityMap) {
+      vicinityMap = L.map(mapElement, { dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+      const streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      });
+      const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+      });
+      for (const layer of [streets, satellite]) {
+        layer.on('tileerror', () => { errorMessage.textContent = 'Some map tiles could not load. Check your connection or switch map layers.'; });
+      }
+      streets.addTo(vicinityMap);
+      L.control.layers({ Map: streets, Satellite: satellite }, null, { collapsed: false }).addTo(vicinityMap);
+      vicinityMap.on('baselayerchange', () => { errorMessage.textContent = ''; });
+      new ResizeObserver(() => vicinityMap.invalidateSize()).observe(mapElement);
+    }
+    const overlays = [];
+    if (settings.boundary?.length >= 3) {
+      overlays.push(L.polygon(settings.boundary.map((point) => [point.latitude, point.longitude]), {
+        color: '#147044', fillColor: '#147044', fillOpacity: 0.18, weight: 3,
+      }).bindTooltip('Barangay reporting vicinity'));
+      vicinityMap.fitBounds(overlays[0].getBounds(), { padding: [25, 25], maxZoom: 17 });
+      note.textContent = 'Showing the reporting boundary saved by the barangay administrator.';
+    } else {
+      const center = settings.legacyVicinity.center;
+      overlays.push(L.circle([center.latitude, center.longitude], {
+        radius: settings.legacyVicinity.radiusMeters, color: '#a86c14', fillOpacity: 0.1, dashArray: '6 6',
+      }).bindTooltip('Approximate reporting vicinity'));
+      vicinityMap.setView([center.latitude, center.longitude], 14);
+      note.textContent = 'No custom boundary has been saved yet. This map shows the approximate 2-km reporting vicinity currently in use.';
+    }
+    vicinityMap.eachLayer((layer) => { if (layer instanceof L.Polygon || layer instanceof L.Circle) vicinityMap.removeLayer(layer); });
+    overlays.forEach((overlay) => overlay.addTo(vicinityMap));
+    status.textContent = settings.enforceReportGeofence ? 'Photo GPS checks on' : 'Photo GPS checks off';
+    vicinityMap.invalidateSize();
+  } catch (error) {
+    status.textContent = 'Map unavailable';
+    errorMessage.textContent = error.message;
+  }
+}
+
+loadResidentVicinity();
 
 function showReportModal({ error = false, message: modalMessage }) {
   reportSuccessModal.classList.toggle('error', error);

@@ -149,6 +149,10 @@ saved, the existing approximate 2-km circle remains active and is labeled on the
 The `ReportGeofence` table is added by Prisma migration during Vercel deployment;
 no existing records or saved report locations are rewritten.
 
+The resident overview shows the saved polygon as a read-only Map/Satellite map;
+residents cannot change or save the admin's boundary. Until a polygon is saved,
+the resident map shows the same approximate 2-km circle used for validation.
+
 When **Barangay location range** is ON, exactly three photos must each contain
 readable embedded GPS inside (or on) the saved boundary. A resident may submit
 from elsewhere: submission-time device coordinates and landmark/center estimates
