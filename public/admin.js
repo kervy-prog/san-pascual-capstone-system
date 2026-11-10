@@ -7,6 +7,7 @@ const reportMediaModal = document.querySelector('#report-media-modal');
 const reportMediaImage = document.querySelector('#report-media-image');
 const reportMediaLocation = document.querySelector('#report-media-location');
 const reportMediaMap = document.querySelector('#report-media-map');
+let reportImageRequest = 0;
 const verificationDocumentModal = document.querySelector('#verification-document-modal');
 const verificationDocumentTitle = document.querySelector('#verification-document-title');
 const verificationDocumentImage = document.querySelector('#verification-document-image');
@@ -21,12 +22,13 @@ const reportGeofenceToggle = document.querySelector('#report-geofence-toggle');
 const geofenceStatus = document.querySelector('#geofence-status');
 
 function closeReportMedia() {
+  reportImageRequest += 1;
+  window.clearReportGeofence();
   const imageUrl = reportMediaImage.src;
   reportMediaModal.classList.add('hidden');
   reportMediaImage.removeAttribute('src');
   reportMediaLocation.innerHTML = '';
   reportMediaMap.classList.add('hidden');
-  reportMediaMap.removeAttribute('src');
   if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
 }
 
@@ -273,7 +275,8 @@ function reportLocationMarkup(report, compact = false) {
 }
 
 function reportMediaButton(image, report) {
-  return `<button class="view-media-button" data-media-path="${image.filePath}" data-location-landmark="${encodeURIComponent(report.exactLocationLandmark)}" data-location-latitude="${report.locationLatitude ?? ''}" data-location-longitude="${report.locationLongitude ?? ''}" data-location-source="${report.locationSource ?? ''}">View image</button>`;
+  const images = report.media?.filter((item) => item.mediaType === 'IMAGE') || [image];
+  return images.map((item, index) => `<button class="view-media-button" data-media-path="${item.filePath}">View image${images.length > 1 ? ` ${index + 1}` : ''}</button>`).join(' ');
 }
 
 async function loadApprovedResidents() {
@@ -378,7 +381,7 @@ async function loadReports(prefetchedReports) {
         return `<tr><td data-label="Report ID"><strong>${report.reportId || report.ticketNumber}</strong></td><td data-label="Ticket">${report.ticketNumber}</td><td data-label="Resident">${report.submitAnonymously ? 'Anonymous' : `${report.resident.firstName} ${report.resident.lastName}`}<small>${report.resident.email}</small></td><td data-label="Category">${report.category.name}</td><td data-label="Urgency">${reportUrgencyLevel(report)}</td><td data-label="Exact location">${report.exactLocationLandmark}</td><td data-label="Description">${report.descriptionOfHazard}${feedbackHtml}</td><td data-label="Assigned official">${assignmentControl(report)}</td><td data-label="Status">${statusControl(report)}</td><td data-label="Media">${mediaAction}</td><td data-label="Submitted">${new Date(report.dateSubmitted).toLocaleDateString('en-PH')}</td></tr>`;
       }).join('')
       : '<tr><td colspan="11" class="empty-state">No reports submitted yet.</td></tr>';
-    document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath, button.dataset)));
+    document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath)));
     document.querySelectorAll('.report-assignee').forEach((select) => select.addEventListener('change', () => assignReport(select.dataset.reportId, select.value || null)));
     document.querySelectorAll('.report-status').forEach((select) => select.addEventListener('change', () => updateReportStatus(select.dataset.reportId, select.value)));
   } catch (error) {
@@ -387,32 +390,39 @@ async function loadReports(prefetchedReports) {
   }
 }
 
-async function viewReportImage(mediaPath, locationData) {
+async function viewReportImage(mediaPath) {
+  closeReportMedia();
+  const currentRequest = reportImageRequest;
   const fileName = mediaPath.split('/').pop();
-  const response = await fetch(`${API_BASE_URL}/api/admin/reports/media/${encodeURIComponent(fileName)}`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) {
-    message.textContent = 'Unable to load the report image.';
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/reports/media/${encodeURIComponent(fileName)}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      message.textContent = 'Unable to load the report image.';
+      message.classList.add('error');
+      return;
+    }
+    const blob = await response.blob();
+    if (currentRequest !== reportImageRequest) return;
+    reportMediaImage.src = URL.createObjectURL(blob);
+    reportMediaLocation.textContent = 'Reading GPS embedded in this photo...';
+    reportMediaModal.classList.remove('hidden');
+    try {
+      const data = await request(`/reports/media/${encodeURIComponent(fileName)}/geofence`);
+      if (currentRequest !== reportImageRequest) return;
+      reportMediaLocation.textContent = data.location
+        ? `Photo GPS: ${data.location.latitude.toFixed(6)}, ${data.location.longitude.toFixed(6)}`
+        : 'Photo GPS is unavailable. Some older or recompressed images may no longer contain GPS metadata.';
+      window.showReportGeofence(data);
+    } catch (error) {
+      if (currentRequest !== reportImageRequest) return;
+      reportMediaLocation.textContent = 'Unable to verify this photo location.';
+      document.querySelector('#report-media-geofence-status').textContent = error.message;
+    }
+  } catch (error) {
+    if (currentRequest !== reportImageRequest) return;
+    message.textContent = `Unable to load the report image: ${error.message}`;
     message.classList.add('error');
-    return;
   }
-  const blob = await response.blob();
-  reportMediaImage.src = URL.createObjectURL(blob);
-  const hasGpsPin = Number.isFinite(Number.parseFloat(locationData.locationLatitude)) && Number.isFinite(Number.parseFloat(locationData.locationLongitude));
-  const locationSource = locationData.locationSource || '';
-  reportMediaLocation.innerHTML = `<strong>${hasGpsPin && locationSource !== 'landmark-geocode-approximate' ? 'Pinned image location' : 'Approximate image location'}</strong><br>${reportLocationMarkup({
-    exactLocationLandmark: decodeURIComponent(locationData.locationLandmark || ''),
-    locationLatitude: Number.parseFloat(locationData.locationLatitude),
-    locationLongitude: Number.parseFloat(locationData.locationLongitude),
-    locationSource,
-  })}`;
-  const latitude = Number.parseFloat(locationData.locationLatitude);
-  const longitude = Number.parseFloat(locationData.locationLongitude);
-  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-    const delta = 0.004;
-    reportMediaMap.src = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - delta}%2C${latitude - delta}%2C${longitude + delta}%2C${latitude + delta}&layer=mapnik&marker=${latitude}%2C${longitude}`;
-    reportMediaMap.classList.remove('hidden');
-  }
-  reportMediaModal.classList.remove('hidden');
 }
 
 function reportApprovalCard(report) {
@@ -433,7 +443,7 @@ async function loadReportApprovals(prefetchedReports) {
       ? pendingReports.map(reportApprovalCard).join('')
       : '<div class="empty-state">No reports are waiting for verification.</div>';
     document.querySelectorAll('[data-report-status]').forEach((button) => button.addEventListener('click', () => updateReportStatus(button.dataset.reportId, button.dataset.reportStatus)));
-    document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath, button.dataset)));
+    document.querySelectorAll('.view-media-button').forEach((button) => button.addEventListener('click', () => viewReportImage(button.dataset.mediaPath)));
     document.querySelectorAll('.report-assignee').forEach((select) => select.addEventListener('change', () => assignReport(select.dataset.reportId, select.value || null)));
   } catch (error) {
     message.textContent = error.message;

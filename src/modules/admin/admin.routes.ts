@@ -5,10 +5,12 @@ import fs from "node:fs";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAdmin } from "../../middleware/require-admin.js";
-import { sendStoredFile } from "../../lib/file-storage.js";
+import { readStoredUpload, sendStoredFile } from "../../lib/file-storage.js";
+import { env } from "../../config/env.js";
 import { compressResolvedReportImages } from "../../lib/report-image-optimization.js";
 import { getAdminActivityVersion } from "../../lib/report-activity.js";
-import { boundarySchema } from "../requests/report-geofence.js";
+import { boundarySchema, isInsideBoundary, isWithinSanPascualVicinity } from "../requests/report-geofence.js";
+import { readPhotoGps } from "../requests/report-photo-location.js";
 import { BoundaryConflictError, getReportGeofenceSettings, saveReportBoundary } from "../requests/report-geofence-settings.js";
 
 const router = Router();
@@ -190,6 +192,42 @@ router.get("/reports", async (_request, response, next) => {
       include: { resident: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } }, category: true, media: true, actions: { include: { official: { include: { resident: { select: { firstName: true, lastName: true } } } } } }, assignedOfficial: { include: { resident: { select: { firstName: true, lastName: true } } } } },
     });
     response.json(reports);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/reports/media/:fileName/geofence", async (request, response, next) => {
+  try {
+    const fileName = path.basename(request.params.fileName);
+    const media = await prisma.reportMedia.findFirst({
+      where: { filePath: `/private-uploads/reports/${fileName}`, mediaType: "IMAGE" },
+      select: { id: true },
+    });
+    if (!media) {
+      response.status(404).json({ error: "Report image not found" });
+      return;
+    }
+    let buffer: Buffer;
+    if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
+      buffer = await readStoredUpload(`reports/${fileName}`);
+    } else {
+      try {
+        buffer = await fs.promises.readFile(path.resolve(process.cwd(), "private-uploads", "reports", fileName));
+      } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+          response.status(404).json({ error: "Report image file not found" });
+          return;
+        }
+        throw error;
+      }
+    }
+    const [location, settings] = await Promise.all([readPhotoGps(buffer), getReportGeofenceSettings()]);
+    const inside = location ? (settings.boundary
+      ? isInsideBoundary(location, settings.boundary)
+      : isWithinSanPascualVicinity(location.latitude, location.longitude)) : null;
+    response.setHeader("Cache-Control", "no-store");
+    response.json({ ...settings, location, inside });
   } catch (error) {
     next(error);
   }

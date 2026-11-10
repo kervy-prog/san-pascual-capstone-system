@@ -2,11 +2,15 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const { Prisma } = require('@prisma/client');
 const { boundarySchema, isInsideBoundary, isWithinSanPascualVicinity } = require('../dist/modules/requests/report-geofence.js');
 const { validateReportPhotoLocations } = require('../dist/modules/requests/report-photo-location.js');
 
 process.env.NODE_ENV = 'test';
+process.env.SUPABASE_URL = 'https://storage.example.invalid';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-only-storage-key';
 process.env.JWT_SECRET = 'geofence-tests-only-not-a-real-secret';
 process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:1/not-used';
 
@@ -40,7 +44,10 @@ const prisma = {
     createdReports.push(data);
     return { id: 'test-report', ticketNumber: 'TEST', ...data };
   } },
-  reportMedia: { createMany: async ({ data }) => { mediaRows.push(...data); return { count: data.length }; } },
+  reportMedia: {
+    findFirst: async ({ where }) => where.filePath.endsWith('/test-photo.jpg') ? { id: 'test-media' } : null,
+    createMany: async ({ data }) => { mediaRows.push(...data); return { count: data.length }; },
+  },
 };
 
 function mockModule(path, exports) {
@@ -94,6 +101,20 @@ function gpsJpeg(jpeg, location) {
 }
 
 (async () => {
+  const adminSource = fs.readFileSync(require('node:path').join(__dirname, '..', 'public', 'admin.js'), 'utf8');
+  const buttonStart = adminSource.indexOf('function reportMediaButton(');
+  const buttonEnd = adminSource.indexOf('\nasync function loadApprovedResidents', buttonStart);
+  assert(buttonStart >= 0 && buttonEnd > buttonStart);
+  const buttonContext = {};
+  vm.createContext(buttonContext);
+  vm.runInContext(adminSource.slice(buttonStart, buttonEnd), buttonContext);
+  const images = Array.from({ length: 3 }, (_, index) => ({ filePath: `/private-uploads/reports/image-${index}.jpg`, mediaType: 'IMAGE' }));
+  const buttons = buttonContext.reportMediaButton(images[0], { media: images });
+  assert.equal((buttons.match(/class="view-media-button"/g) || []).length, 3);
+  images.forEach((image, index) => {
+    assert(buttons.includes(image.filePath));
+    assert(buttons.includes(`View image ${index + 1}`));
+  });
   boundarySchema.parse(boundary);
   assert(isInsideBoundary(inside, boundary));
   assert(!isInsideBoundary(outside, boundary));
@@ -188,6 +209,36 @@ function gpsJpeg(jpeg, location) {
     assert(!Object.hasOwn(residentBoundary, 'save'));
     assert(!Object.hasOwn(residentBoundary, 'edit'));
     assert.equal(stored.revision, 2, 'Read-only resident access must not modify the boundary');
+    const imageCheck = `${base}/api/admin/reports/media/test-photo.jpg/geofence`;
+    assert.equal((await fetch(imageCheck)).status, 401);
+    assert.equal((await fetch(imageCheck, { headers: auth('RESIDENT') })).status, 403);
+    for (const [buffer, expectedInside] of [[original, true], [gpsJpeg(jpeg, outside), false], [jpeg, null]]) {
+      uploadedBuffer = buffer;
+      const check = await fetch(imageCheck, { headers: auth('ADMIN') });
+      assert.equal(check.status, 200);
+      assert.equal(check.headers.get('cache-control'), 'no-store');
+      const result = await check.json();
+      assert.equal(result.inside, expectedInside);
+      assert.deepEqual(result.boundary, stored.boundary);
+      if (expectedInside === null) assert.equal(result.location, null, 'Never substitute report/device pins for photo GPS');
+    }
+    const savedBoundary = stored;
+    stored = undefined;
+    uploadedBuffer = original;
+    const circleCheck = await fetch(imageCheck, { headers: auth('ADMIN') });
+    const circleResult = await circleCheck.json();
+    assert.equal(circleResult.boundary, null);
+    assert.equal(circleResult.inside, true);
+    stored = savedBoundary;
+    const findSetting = prisma.appSetting.findUnique;
+    prisma.appSetting.findUnique = async () => ({ value: false });
+    uploadedBuffer = gpsJpeg(jpeg, outside);
+    const disabledCheck = await fetch(imageCheck, { headers: auth('ADMIN') });
+    const disabledResult = await disabledCheck.json();
+    assert.equal(disabledResult.inside, false, 'Show outside even when enforcement is off');
+    assert.equal(disabledResult.enforceReportGeofence, false);
+    prisma.appSetting.findUnique = findSetting;
+    assert.equal((await fetch(`${base}/api/admin/reports/media/missing.jpg/geofence`, { headers: auth('ADMIN') })).status, 404);
     for (const [payload, status] of [
       [{ boundary: [boundary[0]], expectedRevision: 2 }, 400],
       [{ boundary, expectedRevision: 1 }, 409],
@@ -236,7 +287,7 @@ function gpsJpeg(jpeg, location) {
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
-  console.log('PASS: polygon geometry, real JPEG GPS, all 3 photos, legacy circle, enforcement off, saved revisions/conflicts, admin/resident authorization, read-only resident boundary, multipart/direct uploads, and device-location independence. No database or storage writes.');
+  console.log('PASS: per-image admin geofence (inside/outside/unknown), all photo buttons, polygon geometry, real JPEG GPS, legacy circle, enforcement off, revisions/conflicts, authorization, read-only resident boundary, multipart/direct uploads, and device-location independence. No database or storage writes.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

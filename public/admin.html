@@ -56,7 +56,9 @@
       <div class="section-heading"><h2 id="report-media-title">Report image</h2><button type="button" class="media-modal-close" id="close-report-media">Close</button></div>
       <img id="report-media-image" alt="Uploaded infrastructure report" />
       <p id="report-media-location" class="report-media-location"></p>
-      <iframe id="report-media-map" class="report-media-map hidden" title="Image location map" loading="lazy"></iframe>
+      <p id="report-media-geofence-status" role="status" aria-live="polite"></p>
+      <div id="report-media-map" class="report-media-map hidden" aria-label="Photo GPS and current barangay geofence"></div>
+      <p id="report-media-map-error" role="alert"></p>
     </div>
   </div>
   <div class="media-modal hidden" id="verification-document-modal" role="dialog" aria-modal="true" aria-labelledby="verification-document-title">
@@ -83,6 +85,7 @@
   <script src="/config.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
   <script src="/admin-geofence.js" defer></script>
+  <script src="/admin-report-geofence.js" defer></script>
   <script src="/admin.js" defer></script>
 </body>
 </html>

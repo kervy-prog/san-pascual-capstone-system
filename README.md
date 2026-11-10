@@ -152,6 +152,12 @@ no existing records or saved report locations are rewritten.
 The resident overview shows the saved polygon as a read-only Map/Satellite map;
 residents cannot change or save the admin's boundary. Until a polygon is saved,
 the resident map shows the same approximate 2-km circle used for validation.
+When an admin opens a report image, the viewer shows that photo's embedded GPS
+against the current saved vicinity on a read-only Map/Satellite map, with an
+Inside/Outside indicator. Each report image can be opened separately. Missing or
+stripped photo GPS is shown as unverified, never substituted with device GPS or a
+report-level approximate pin. Checks use the current boundary, not a historical
+submission boundary, and still display when enforcement is off.
 
 When **Barangay location range** is ON, exactly three photos must each contain
 readable embedded GPS inside (or on) the saved boundary. A resident may submit

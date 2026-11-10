@@ -10,11 +10,22 @@ const photoGpsSchema = z.object({
   longitude: z.number().finite().min(-180).max(180),
 });
 
+export async function readPhotoGps(buffer: Buffer): Promise<BoundaryPoint | null> {
+  let metadata: unknown;
+  try {
+    metadata = await gps(buffer);
+  } catch (error) {
+    console.warn("Unable to read report image GPS:", error instanceof Error ? error.message : "Invalid metadata");
+  }
+  const parsed = photoGpsSchema.safeParse(metadata);
+  return parsed.success ? parsed.data : null;
+}
+
 export async function validateReportPhotoLocations(
   files: { buffer: Buffer }[],
   enforceGeofence: boolean,
   boundary: BoundaryPoint[] | null,
-  extractGps: (buffer: Buffer) => Promise<unknown> = gps,
+  extractGps: (buffer: Buffer) => Promise<unknown> = readPhotoGps,
 ) {
   if (files.length !== 3) throw new ReportPhotoLocationError("Upload exactly 3 photos before submitting your report.");
   let photoLocation: BoundaryPoint | undefined;
